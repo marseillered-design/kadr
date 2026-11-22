@@ -75,6 +75,8 @@ namespace Kadr
 
         static void RenderTest(string outDir)
         {
+            string lc = Environment.GetEnvironmentVariable("KADR_LANG");
+            if (!string.IsNullOrEmpty(lc)) L.Current = lc;
             Directory.CreateDirectory(outDir);
             var s = new Settings();
             s.Uploaders.Add(new CustomUploader { Name = "Мой сервер" });
@@ -116,6 +118,8 @@ namespace Kadr
 
         static void FormTest(string outDir)
         {
+            string lc = Environment.GetEnvironmentVariable("KADR_LANG");
+            if (!string.IsNullOrEmpty(lc)) L.Current = lc;
             Directory.CreateDirectory(outDir);
             var s = new Settings();
             s.Uploaders.Add(new CustomUploader { Name = "Мой сервер", RequestURL = "https://example.com/upload", URL = "{json:data.url}" });
@@ -144,6 +148,16 @@ namespace Kadr
                 b.Save(Path.Combine(outDir, "toast.png"), ImageFormat.Png);
             }
             t.Close();
+
+            var sv = Toast.Info(FakeScreen(800, 450), L.T("Снимок сохранён"), @"C:\Users\me\Pictures\Kadr\Screenshot 2026-11-22 19-40-00.png", null, 8);
+            sv.SetButton("\uE838", null, false);
+            Application.DoEvents();
+            using (var b = new Bitmap(sv.Width, sv.Height))
+            {
+                sv.DrawToBitmap(b, new Rectangle(0, 0, sv.Width, sv.Height));
+                b.Save(Path.Combine(outDir, "toast-saved.png"), ImageFormat.Png);
+            }
+            sv.Close();
         }
     }
 }

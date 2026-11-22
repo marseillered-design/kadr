@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -62,7 +63,7 @@ namespace Kadr
 
         public static string ShotName(string ext)
         {
-            return "Снимок " + DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss") + ext;
+            return L.T("Снимок") + " " + DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss") + ext;
         }
     }
 
@@ -119,24 +120,27 @@ namespace Kadr
             }
         }
 
-        static string SendToLink
+        static string SendToDir { get { return Environment.GetFolderPath(Environment.SpecialFolder.SendTo); } }
+        static string SendToLink { get { return Path.Combine(SendToDir, L.T("Кадр (загрузить)") + ".lnk"); } }
+        static IEnumerable<string> AllSendToLinks
         {
-            get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.SendTo), "Кадр (загрузить).lnk"); }
+            get { for (int i = 0; i < L.Codes.Length; i++) yield return Path.Combine(SendToDir, L.In(i, "Кадр (загрузить)") + ".lnk"); }
         }
 
         public static bool SendTo
         {
-            get { return File.Exists(SendToLink); }
+            get { return AllSendToLinks.Any(File.Exists); }
             set
             {
-                if (!value) { try { File.Delete(SendToLink); } catch { } return; }
+                foreach (var old in AllSendToLinks) { try { if (File.Exists(old)) File.Delete(old); } catch { } }
+                if (!value) return;
                 Type t = Type.GetTypeFromProgID("WScript.Shell");
                 object sh = Activator.CreateInstance(t);
                 object lnk = t.InvokeMember("CreateShortcut", System.Reflection.BindingFlags.InvokeMethod, null, sh, new object[] { SendToLink });
                 Type lt = lnk.GetType();
                 lt.InvokeMember("TargetPath", System.Reflection.BindingFlags.SetProperty, null, lnk, new object[] { Application.ExecutablePath });
                 lt.InvokeMember("IconLocation", System.Reflection.BindingFlags.SetProperty, null, lnk, new object[] { Application.ExecutablePath + ",0" });
-                lt.InvokeMember("Description", System.Reflection.BindingFlags.SetProperty, null, lnk, new object[] { "Загрузить картинку через Кадр" });
+                lt.InvokeMember("Description", System.Reflection.BindingFlags.SetProperty, null, lnk, new object[] { L.T("Загрузить картинку через Кадр") });
                 lt.InvokeMember("Save", System.Reflection.BindingFlags.InvokeMethod, null, lnk, null);
             }
         }

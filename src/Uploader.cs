@@ -39,7 +39,7 @@ namespace Kadr
             if (destination == Settings.Imgur) return Imgur(s.ImgurClientId, data, fileName, contentType);
             if (destination == Settings.Catbox) return Custom(Settings.CatboxConfig(), data, fileName, contentType);
             var u = s.Uploaders.FirstOrDefault(x => x.Name == destination);
-            if (u == null) throw new UserError("Сервис «" + destination + "» не найден в настройках.");
+            if (u == null) throw new UserError(L.F("Сервис «{0}» не найден в настройках.", destination));
             return Custom(u, data, fileName, contentType);
         }
 
@@ -48,7 +48,7 @@ namespace Kadr
         public static async Task<UploadResult> Imgur(string clientId, byte[] data, string fileName, string contentType)
         {
             if (string.IsNullOrWhiteSpace(clientId))
-                throw new UserError("Для Imgur нужен Client ID (Настройки в меню значка Кадра). Без регистрации работает Catbox: стрелка ▾ рядом с кнопкой загрузки.");
+                throw new UserError(L.T("Для Imgur нужен Client ID (Настройки в меню значка Кадра). Без регистрации работает Catbox: стрелка ▾ рядом с кнопкой загрузки."));
 
             var form = new MultipartFormDataContent();
             var file = new ByteArrayContent(data);
@@ -76,8 +76,8 @@ namespace Kadr
                 return new UploadResult { Url = link, ImgurDeleteHash = hash };
             }
             string err = json == null ? null : (Json.Str(json, "data.error.message") ?? Json.Str(json, "data.error") ?? Json.Str(json, "errors[0].detail"));
-            if ((int)code == 429) err = "Imgur просит подождать: слишком много загрузок. Попробуй через час.";
-            else if ((int)code == 401 || (int)code == 403) err = "Imgur не принял Client ID (" + (err ?? "доступ запрещён") + "). Проверь его в настройках.";
+            if ((int)code == 429) err = L.T("Imgur просит подождать: слишком много загрузок. Попробуй через час.");
+            else if ((int)code == 401 || (int)code == 403) err = L.F("Imgur не принял Client ID ({0}). Проверь его в настройках.", err ?? L.T("доступ запрещён"));
             throw new UserError("Imgur: " + (err ?? Short(text, (int)code)));
         }
 
@@ -97,7 +97,7 @@ namespace Kadr
         public static async Task<UploadResult> Custom(CustomUploader u, byte[] data, string fileName, string contentType)
         {
             u.Normalize();
-            if (string.IsNullOrWhiteSpace(u.RequestURL)) throw new UserError("У сервиса «" + u.Name + "» не указан адрес.");
+            if (string.IsNullOrWhiteSpace(u.RequestURL)) throw new UserError(L.F("У сервиса «{0}» не указан адрес.", u.Name));
 
             string url = Fill(u.RequestURL, fileName);
             if (u.Parameters.Count > 0)
@@ -130,7 +130,7 @@ namespace Kadr
                 AddFile(form, file, u.FileFormName, fileName);
                 req.Content = form;
             }
-            else throw new UserError("Тип тела «" + u.Body + "» не поддерживается: нужен MultipartFormData или Binary.");
+            else throw new UserError(L.F("Тип тела «{0}» не поддерживается: нужен MultipartFormData или Binary.", u.Body));
 
             foreach (var h in u.Headers)
             {
@@ -152,7 +152,7 @@ namespace Kadr
 
             string link = string.IsNullOrWhiteSpace(u.URL) ? text.Trim() : Parse(u.URL, text);
             if (string.IsNullOrWhiteSpace(link) || !(link.StartsWith("http://") || link.StartsWith("https://")))
-                throw new UserError(u.Name + ": в ответе не нашлась ссылка. Ответ сервера: " + Short(text, 0));
+                throw new UserError(u.Name + ": " + L.F("в ответе не нашлась ссылка. Ответ сервера: {0}", Short(text, 0)));
             string del = string.IsNullOrWhiteSpace(u.DeletionURL) ? null : Parse(u.DeletionURL, text);
             return new UploadResult { Url = link.Trim(), DeleteUrl = string.IsNullOrWhiteSpace(del) ? null : del.Trim() };
         }
@@ -174,7 +174,10 @@ namespace Kadr
             const string ru = "абвгдеёжзийклмнопрстуфхцчшщъыьэюяієїґ";
             string[] lat = { "a","b","v","g","d","e","e","zh","z","i","y","k","l","m","n","o","p","r","s","t","u","f","h","ts","ch","sh","sch","","y","","e","yu","ya","i","ie","i","g" };
             var sb = new StringBuilder();
-            foreach (char ch in fileName.ToLowerInvariant())
+            string plain = new string(fileName.Normalize(NormalizationForm.FormD)
+                .Where(c => System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c) != System.Globalization.UnicodeCategory.NonSpacingMark).ToArray())
+                .Normalize(NormalizationForm.FormC).Replace("ß", "ss");
+            foreach (char ch in plain.ToLowerInvariant())
             {
                 int i = ru.IndexOf(ch);
                 if (i >= 0) sb.Append(lat[i]);
@@ -231,8 +234,8 @@ namespace Kadr
             string t = Regex.Replace(text ?? "", "<[^>]+>", " ");
             t = Regex.Replace(t, @"\s+", " ").Trim();
             if (t.Length > 220) t = t.Substring(0, 220) + "…";
-            if (code > 0) t = "ошибка " + code + (t.Length > 0 ? " — " + t : "");
-            return t.Length == 0 ? "пустой ответ сервера" : t;
+            if (code > 0) t = L.F("ошибка {0}", code) + (t.Length > 0 ? " — " + t : "");
+            return t.Length == 0 ? L.T("пустой ответ сервера") : t;
         }
     }
 }

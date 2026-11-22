@@ -99,7 +99,7 @@ namespace Kadr
             TopMost = true;
             KeyPreview = true;
             Cursor = Cursors.Cross;
-            Text = "Кадр";
+            Text = L.T("Кадр");
             SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.Opaque, true);
 
             if (initial.HasValue)
@@ -159,23 +159,23 @@ namespace Kadr
 
             var tools = new[]
             {
-                new Btn { Cmd = Cmd.Tool, Tool = Tool.Pen, Tip = "Карандаш (P)" },
-                new Btn { Cmd = Cmd.Tool, Tool = Tool.Line, Tip = "Линия (L)" },
-                new Btn { Cmd = Cmd.Tool, Tool = Tool.Arrow, Tip = "Стрелка (A)" },
-                new Btn { Cmd = Cmd.Tool, Tool = Tool.Rect, Tip = "Прямоугольник (R)" },
-                new Btn { Cmd = Cmd.Tool, Tool = Tool.Marker, Tip = "Маркер (M)" },
-                new Btn { Cmd = Cmd.Tool, Tool = Tool.Text, Tip = "Текст (T)" },
-                new Btn { Cmd = Cmd.Tool, Tool = Tool.Blur, Tip = "Скрыть пикселями (B)" },
-                new Btn { Cmd = Cmd.Color, Tip = "Цвет" },
-                new Btn { Cmd = Cmd.Undo, Tip = "Отменить (Ctrl+Z)" },
+                new Btn { Cmd = Cmd.Tool, Tool = Tool.Pen, Tip = L.T("Карандаш (P)") },
+                new Btn { Cmd = Cmd.Tool, Tool = Tool.Line, Tip = L.T("Линия (L)") },
+                new Btn { Cmd = Cmd.Tool, Tool = Tool.Arrow, Tip = L.T("Стрелка (A)") },
+                new Btn { Cmd = Cmd.Tool, Tool = Tool.Rect, Tip = L.T("Прямоугольник (R)") },
+                new Btn { Cmd = Cmd.Tool, Tool = Tool.Marker, Tip = L.T("Маркер (M)") },
+                new Btn { Cmd = Cmd.Tool, Tool = Tool.Text, Tip = L.T("Текст (T)") },
+                new Btn { Cmd = Cmd.Tool, Tool = Tool.Blur, Tip = L.T("Скрыть пикселями (B)") },
+                new Btn { Cmd = Cmd.Color, Tip = L.T("Цвет") },
+                new Btn { Cmd = Cmd.Undo, Tip = L.T("Отменить (Ctrl+Z)") },
             };
             var actions = new[]
             {
-                new Btn { Cmd = Cmd.Upload, Tip = "Загрузить в " + S.Default() + " (Ctrl+D)" },
-                new Btn { Cmd = Cmd.UploadMenu, Tip = "Выбрать, куда загрузить" },
-                new Btn { Cmd = Cmd.Copy, Tip = "Копировать (Ctrl+C)" },
-                new Btn { Cmd = Cmd.Save, Tip = "Сохранить (Ctrl+S)" },
-                new Btn { Cmd = Cmd.Close, Tip = "Закрыть (Esc)" },
+                new Btn { Cmd = Cmd.Upload, Tip = L.F("Загрузить в {0} (Ctrl+D)", S.Default()) },
+                new Btn { Cmd = Cmd.UploadMenu, Tip = L.T("Выбрать, куда загрузить") },
+                new Btn { Cmd = Cmd.Copy, Tip = L.T("Копировать (Ctrl+C)") },
+                new Btn { Cmd = Cmd.Save, Tip = L.T("Сохранить (Ctrl+S)") },
+                new Btn { Cmd = Cmd.Close, Tip = L.T("Закрыть (Esc)") },
             };
 
             int aw = 4 * bs + narrow + 2 * pad, ah = bs + 2 * pad;
@@ -374,7 +374,7 @@ namespace Kadr
         void DrawHint(Graphics g)
         {
             var r = HintRect();
-            string text = "Выдели область мышью или щёлкни, чтобы взять весь экран · Esc — отмена";
+            string text = L.T("Выдели область мышью или щёлкни, чтобы взять весь экран · Esc — отмена");
             var sz = g.MeasureString(text, uiFont);
             r = new Rectangle(r.X + (r.Width - (int)sz.Width - Sc(28)) / 2, r.Y, (int)sz.Width + Sc(28), r.Height);
             using (var path = UI.Round(r, Sc(10)))
@@ -674,7 +674,7 @@ namespace Kadr
             if (ns == size && sizeTip != null) return;
             size = ns;
             if (editing != null) { var before = editing.Bounds; editing.Size = size; Invalidate(Rectangle.Union(before, editing.Bounds)); }
-            sizeTip = "Размер " + size;
+            sizeTip = L.F("Размер {0}", size);
             sizeTipUntil = DateTime.Now.AddMilliseconds(900);
             Refresh2();
         }
@@ -835,14 +835,14 @@ namespace Kadr
             var m = new ContextMenuStrip { Font = new Font("Segoe UI", 10f), ShowImageMargin = false };
             foreach (var d in dests)
             {
-                var item = new ToolStripMenuItem("Загрузить в " + d);
+                var item = new ToolStripMenuItem(L.F("Загрузить в {0}", d));
                 if (d == S.Default()) item.Font = new Font(m.Font, FontStyle.Bold);
                 string dest = d;
                 item.Click += (s, e) => Finish("upload", dest);
                 m.Items.Add(item);
             }
             m.Items.Add(new ToolStripSeparator());
-            var hint = new ToolStripMenuItem("Свои сервисы добавляются в настройках") { Enabled = false };
+            var hint = new ToolStripMenuItem(L.T("Свои сервисы добавляются в настройках")) { Enabled = false };
             m.Items.Add(hint);
             m.Show(this, new Point(b.R.Left, b.R.Bottom + Sc(4)));
         }

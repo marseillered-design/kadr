@@ -124,68 +124,74 @@ namespace Kadr
         readonly TextBox imgurId, folder;
         readonly CheckBox copyLink, openBrowser, askName, hookKey, autostart, sendTo;
         readonly HotkeyBox hotkey;
+        readonly ComboBox lang;
+        public bool LanguageChanged;
         readonly ListBox list;
 
         public SettingsForm(Settings s)
         {
             S = s;
             ups = s.Uploaders.Select(u => u.Clone()).ToList();
-            Lay.Dialog(this, "Кадр — настройки");
+            Lay.Dialog(this, L.T("Кадр — настройки"));
 
             var root = Lay.Table(1);
 
             // Upload
             var up = Lay.Table(2);
             dest = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = UI.S(240), Margin = new Padding(0, UI.S(3), 0, UI.S(3)) };
-            Lay.Row(up, Lay.Label("Куда загружать по умолчанию:"), dest);
+            Lay.Row(up, Lay.Label(L.T("Куда загружать по умолчанию:")), dest);
             imgurId = Lay.Text(240, s.ImgurClientId);
-            var howTo = new LinkLabel { Text = "Где его взять?", AutoSize = true, Margin = new Padding(0, UI.S(6), 0, 0) };
+            var howTo = new LinkLabel { Text = L.T("Где его взять?"), AutoSize = true, Margin = new Padding(0, UI.S(6), 0, 0) };
             howTo.LinkClicked += (o, e) => ImgurHelp();
             Lay.Row(up, Lay.Label("Imgur Client ID:"), Lay.Flow(imgurId, howTo));
-            copyLink = Lay.Check("Копировать ссылку после загрузки", s.CopyLink);
-            openBrowser = Lay.Check("Открывать ссылку в браузере", s.OpenInBrowser);
-            Lay.Row(up, new Label(), Lay.Hint("Catbox работает без регистрации, ссылки вечные. Для Imgur нужен Client ID.", 300));
+            copyLink = Lay.Check(L.T("Копировать ссылку после загрузки"), s.CopyLink);
+            openBrowser = Lay.Check(L.T("Открывать ссылку в браузере"), s.OpenInBrowser);
+            Lay.Row(up, new Label(), Lay.Hint(L.T("Catbox работает без регистрации, ссылки вечные. Для Imgur нужен Client ID."), 300));
             Lay.Row(up, copyLink);
             Lay.Row(up, openBrowser);
-            root.Controls.Add(Lay.Group("Загрузка", up));
+            root.Controls.Add(Lay.Group(L.T("Загрузка"), up));
 
             // Own services
             var own = Lay.Table(2);
             list = new ListBox { Width = UI.S(300), Height = UI.S(110), IntegralHeight = false, Margin = new Padding(0, UI.S(3), UI.S(8), UI.S(3)) };
             list.DoubleClick += (o, e) => EditSelected();
             var col = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = false, Margin = new Padding(0) };
-            col.Controls.Add(Lay.Button("Добавить…", (o, e) => AddNew()));
-            col.Controls.Add(Lay.Button("Изменить…", (o, e) => EditSelected()));
-            col.Controls.Add(Lay.Button("Удалить", (o, e) => DeleteSelected()));
-            col.Controls.Add(Lay.Button("Импорт .sxcu…", (o, e) => Import()));
+            col.Controls.Add(Lay.Button(L.T("Добавить…"), (o, e) => AddNew()));
+            col.Controls.Add(Lay.Button(L.T("Изменить…"), (o, e) => EditSelected()));
+            col.Controls.Add(Lay.Button(L.T("Удалить"), (o, e) => DeleteSelected()));
+            col.Controls.Add(Lay.Button(L.T("Импорт .sxcu…"), (o, e) => Import()));
             Lay.Row(own, list, col);
-            Lay.Row(own, Lay.Hint("Любой сайт, который принимает картинку по HTTP: свой сервер, Catbox, ImgBB, Zipline и т. п. Готовые настройки ShareX (.sxcu) можно импортировать.", 440));
-            root.Controls.Add(Lay.Group("Свои сервисы для загрузки", own));
+            Lay.Row(own, Lay.Hint(L.T("Любой сайт, который принимает картинку по HTTP: свой сервер, Catbox, ImgBB, Zipline и т. п. Готовые настройки ShareX (.sxcu) можно импортировать."), 440));
+            root.Controls.Add(Lay.Group(L.T("Свои сервисы для загрузки"), own));
 
             // Saving
             var sv = Lay.Table(2);
             folder = Lay.Text(300, s.SaveFolder);
-            Lay.Row(sv, Lay.Label("Папка:"), Lay.Flow(folder, Lay.Button("Обзор…", (o, e) => PickFolder())));
-            askName = Lay.Check("Спрашивать имя файла при сохранении (Ctrl+S)", s.AskFileName);
+            Lay.Row(sv, Lay.Label(L.T("Папка:")), Lay.Flow(folder, Lay.Button(L.T("Обзор…"), (o, e) => PickFolder())));
+            askName = Lay.Check(L.T("Спрашивать имя файла при сохранении (Ctrl+S)"), s.AskFileName);
             Lay.Row(sv, askName);
-            root.Controls.Add(Lay.Group("Сохранение", sv));
+            root.Controls.Add(Lay.Group(L.T("Сохранение"), sv));
 
             // General
             var gen = Lay.Table(1);
-            hookKey = Lay.Check("Снимок по сочетанию клавиш:", s.HookPrintScreen);
+            lang = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = UI.S(170), Margin = new Padding(0, UI.S(3), 0, UI.S(3)) };
+            lang.Items.AddRange(L.Names);
+            lang.SelectedIndex = L.Index;
+            Lay.Row(gen, Lay.Flow(Lay.Label(L.T("Язык:")), lang));
+            hookKey = Lay.Check(L.T("Снимок по сочетанию клавиш:"), s.HookPrintScreen);
             hotkey = new HotkeyBox(s.Hotkey);
             hookKey.CheckedChanged += (o, e) => hotkey.Enabled = hookKey.Checked;
             hotkey.Enabled = hookKey.Checked;
-            autostart = Lay.Check("Запускать Кадр вместе с Windows", Shell.Autostart);
-            sendTo = Lay.Check("Пункт «Кадр (загрузить)» в меню «Отправить» для картинок", Shell.SendTo);
+            autostart = Lay.Check(L.T("Запускать Кадр вместе с Windows"), Shell.Autostart);
+            sendTo = Lay.Check(L.T("Пункт «Кадр (загрузить)» в меню «Отправить» для картинок"), Shell.SendTo);
             Lay.Row(gen, Lay.Flow(hookKey, hotkey));
-            Lay.Row(gen, Lay.Hint("Щёлкни в поле и нажми нужное сочетание, например Shift+PageUp. Пока открыто это окно, сочетание не срабатывает.", 440));
+            Lay.Row(gen, Lay.Hint(L.T("Щёлкни в поле и нажми нужное сочетание, например Shift+PageUp. Пока открыто это окно, сочетание не срабатывает."), 440));
             Lay.Row(gen, autostart);
             Lay.Row(gen, sendTo);
-            root.Controls.Add(Lay.Group("Общее", gen));
+            root.Controls.Add(Lay.Group(L.T("Общее"), gen));
 
-            var ok = Lay.Button("Сохранить", (o, e) => SaveAndClose());
-            var cancel = Lay.Button("Отмена", (o, e) => Close());
+            var ok = Lay.Button(L.T("Сохранить"), (o, e) => SaveAndClose());
+            var cancel = Lay.Button(L.T("Отмена"), (o, e) => Close());
             root.Controls.Add(Lay.Buttons(ok, cancel));
             AcceptButton = ok;
             CancelButton = cancel;
@@ -208,14 +214,14 @@ namespace Kadr
         static string Host(string url)
         {
             Uri u;
-            return Uri.TryCreate(url ?? "", UriKind.Absolute, out u) ? u.Host : "адрес не указан";
+            return Uri.TryCreate(url ?? "", UriKind.Absolute, out u) ? u.Host : L.T("адрес не указан");
         }
 
         string CurrentDest { get { return dest.SelectedItem as string ?? Settings.Catbox; } }
 
         void AddNew()
         {
-            var u = new CustomUploader { Name = UniqueName("Мой сервис") };
+            var u = new CustomUploader { Name = UniqueName(L.T("Мой сервис")) };
             using (var f = new UploaderForm(u))
                 if (f.ShowDialog(this) == DialogResult.OK) { u.Name = UniqueName(u.Name); ups.Add(u); RefreshLists(CurrentDest); list.SelectedIndex = ups.Count - 1; }
         }
@@ -240,14 +246,14 @@ namespace Kadr
         {
             int i = list.SelectedIndex;
             if (i < 0) return;
-            if (MessageBox.Show(this, "Удалить сервис «" + ups[i].Name + "»?", "Кадр", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+            if (MessageBox.Show(this, L.F("Удалить сервис «{0}»?", ups[i].Name), L.T("Кадр"), MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
             ups.RemoveAt(i);
             RefreshLists(CurrentDest);
         }
 
         void Import()
         {
-            using (var d = new OpenFileDialog { Filter = "Настройки ShareX (*.sxcu)|*.sxcu|JSON|*.json|Все файлы|*.*", Multiselect = true })
+            using (var d = new OpenFileDialog { Filter = L.T("Настройки ShareX") + " (*.sxcu)|*.sxcu|JSON|*.json|" + L.T("Все файлы") + "|*.*", Multiselect = true })
             {
                 if (d.ShowDialog(this) != DialogResult.OK) return;
                 var errors = new StringBuilder();
@@ -256,23 +262,23 @@ namespace Kadr
                     try
                     {
                         var u = Json.Ser.Deserialize<CustomUploader>(File.ReadAllText(file));
-                        if (u == null || string.IsNullOrWhiteSpace(u.RequestURL)) throw new Exception("в файле нет адреса загрузки (RequestURL)");
+                        if (u == null || string.IsNullOrWhiteSpace(u.RequestURL)) throw new Exception(L.T("в файле нет адреса загрузки (RequestURL)"));
                         u.Normalize();
-                        if (u.Name == "Мой сервис") u.Name = Path.GetFileNameWithoutExtension(file);
+                        if (u.Name == L.T("Мой сервис")) u.Name = Path.GetFileNameWithoutExtension(file);
                         u.Name = UniqueName(u.Name);
                         ups.Add(u);
                     }
                     catch (Exception ex) { errors.AppendLine(Path.GetFileName(file) + ": " + ex.Message); }
                 }
                 RefreshLists(CurrentDest);
-                if (errors.Length > 0) MessageBox.Show(this, "Не всё удалось импортировать:\n\n" + errors, "Кадр", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                if (errors.Length > 0) MessageBox.Show(this, L.T("Не всё удалось импортировать:") + "\n\n" + errors, L.T("Кадр"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 
         string UniqueName(string name, int except = -1)
         {
-            string n = string.IsNullOrWhiteSpace(name) ? "Мой сервис" : name.Trim();
-            if (n == Settings.Imgur || n == Settings.Catbox) n += " (свой)";
+            string n = string.IsNullOrWhiteSpace(name) ? L.T("Мой сервис") : name.Trim();
+            if (n == Settings.Imgur || n == Settings.Catbox) n += L.T(" (свой)");
             string candidate = n;
             int k = 2;
             while (ups.Where((u, i) => i != except).Any(u => u.Name == candidate)) candidate = n + " " + k++;
@@ -281,23 +287,14 @@ namespace Kadr
 
         void PickFolder()
         {
-            using (var d = new FolderBrowserDialog { SelectedPath = folder.Text, Description = "Куда сохранять снимки" })
+            using (var d = new FolderBrowserDialog { SelectedPath = folder.Text, Description = L.T("Куда сохранять снимки") })
                 if (d.ShowDialog(this) == DialogResult.OK) folder.Text = d.SelectedPath;
         }
 
         void ImgurHelp()
         {
-            var text =
-                "Imgur выдаёт бесплатный Client ID для программ:\n\n" +
-                "1. Войди на imgur.com (или зарегистрируйся).\n" +
-                "2. Открой api.imgur.com/oauth2/addclient (сейчас откроется).\n" +
-                "3. Application name — любое, например «Кадр».\n" +
-                "4. Authorization type — «Anonymous usage without user authorization».\n" +
-                "5. Authorization callback URL — любой, например https://example.com\n" +
-                "6. Укажи свою почту, пройди проверку и нажми Submit.\n" +
-                "7. Скопируй Client ID (не Client secret!) в это поле.\n\n" +
-                "Картинки загружаются анонимно: у ссылок нет владельца, удалить их можно из «Истории загрузок».";
-            MessageBox.Show(this, text, "Как получить Imgur Client ID", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            var text = L.T("imgur.help");
+            MessageBox.Show(this, text, L.T("Как получить Imgur Client ID"), MessageBoxButtons.OK, MessageBoxIcon.Information);
             Shell.Open("https://api.imgur.com/oauth2/addclient");
         }
 
@@ -305,11 +302,15 @@ namespace Kadr
         {
             if (hookKey.Checked && !Settings.HotkeyAllowed(hotkey.Value))
             {
-                MessageBox.Show(this, "Сочетание «" + Settings.KeyText(hotkey.Value) + "» мешало бы печатать. Добавь Ctrl, Alt или Shift (например Shift+PageUp) или возьми F1–F12, PrtScn, Pause, Insert, PageUp.", "Кадр", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(this, L.F("Сочетание «{0}» мешало бы печатать. Добавь Ctrl, Alt или Shift (например Shift+PageUp) или возьми F1–F12, PrtScn, Pause, Insert, PageUp.", Settings.KeyText(hotkey.Value)), L.T("Кадр"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 hotkey.Focus();
                 return;
             }
             S.Hotkey = hotkey.Value;
+            string code = L.Codes[Math.Max(0, lang.SelectedIndex)];
+            LanguageChanged = code != L.Current;
+            S.Language = code;
+            L.Current = code;
             S.ImgurClientId = imgurId.Text.Trim();
             S.CopyLink = copyLink.Checked;
             S.OpenInBrowser = openBrowser.Checked;
@@ -320,9 +321,9 @@ namespace Kadr
             S.DefaultDestination = CurrentDest;
             S.Save();
             try { if (Shell.Autostart != autostart.Checked) Shell.Autostart = autostart.Checked; }
-            catch (Exception ex) { MessageBox.Show(this, "Не удалось настроить автозапуск: " + ex.Message, "Кадр"); }
+            catch (Exception ex) { MessageBox.Show(this, L.T("Не удалось настроить автозапуск:") + " " + ex.Message, L.T("Кадр")); }
             try { if (Shell.SendTo != sendTo.Checked) Shell.SendTo = sendTo.Checked; }
-            catch (Exception ex) { MessageBox.Show(this, "Не удалось изменить меню «Отправить»: " + ex.Message, "Кадр"); }
+            catch (Exception ex) { MessageBox.Show(this, L.T("Не удалось изменить меню «Отправить»:") + " " + ex.Message, L.T("Кадр")); }
             Close();
         }
     }
@@ -377,7 +378,7 @@ namespace Kadr
         {
             U = u;
             U.Normalize();
-            Lay.Dialog(this, "Свой сервис для загрузки");
+            Lay.Dialog(this, L.T("Свой сервис для загрузки"));
             ShowInTaskbar = false;
 
             var t = Lay.Table(2);
@@ -387,7 +388,7 @@ namespace Kadr
             method.Items.AddRange(new object[] { "POST", "PUT", "PATCH" });
             method.SelectedItem = method.Items.Contains(u.RequestMethod.ToUpperInvariant()) ? u.RequestMethod.ToUpperInvariant() : "POST";
             body = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = UI.S(270), Margin = new Padding(0, UI.S(3), 0, UI.S(3)) };
-            body.Items.AddRange(new object[] { "Форма (MultipartFormData)", "Файл целиком (Binary)" });
+            body.Items.AddRange(new object[] { L.T("Форма (MultipartFormData)"), L.T("Файл целиком (Binary)") });
             body.SelectedIndex = u.Body.Equals("Binary", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
             field = Lay.Text(160, u.FileFormName);
             headers = Multi(Lay.DictToLines(u.Headers, ": "));
@@ -395,23 +396,23 @@ namespace Kadr
             link = Lay.Text(380, u.URL);
             del = Lay.Text(380, u.DeletionURL);
 
-            Lay.Row(t, Lay.Label("Название:"), name);
-            Lay.Row(t, Lay.Label("Адрес загрузки:"), url);
-            Lay.Row(t, Lay.Label("Метод:"), method);
-            Lay.Row(t, Lay.Label("Как отправлять:"), body);
-            Lay.Row(t, Lay.Label("Имя поля с файлом:"), field);
-            Lay.Row(t, Lay.Label("Заголовки:"), headers);
-            Lay.Row(t, new Label(), Lay.Hint("По строке: Имя: значение. Например  Authorization: Bearer ключ", 380));
-            Lay.Row(t, Lay.Label("Доп. поля формы:"), args);
-            Lay.Row(t, new Label(), Lay.Hint("По строке: имя=значение. Например  reqtype=fileupload", 380));
-            Lay.Row(t, Lay.Label("Ссылка в ответе:"), link);
-            Lay.Row(t, new Label(), Lay.Hint("Пусто — сервер отвечает просто ссылкой. Если отвечает JSON: {json:data.url} или {json:files[0].url}. Ещё можно {regex:https?://\\S+}.", 380));
-            Lay.Row(t, Lay.Label("Ссылка удаления:"), del);
-            Lay.Row(t, new Label(), Lay.Hint("Необязательно. Так же, например {json:data.delete_url}.", 380));
+            Lay.Row(t, Lay.Label(L.T("Название:")), name);
+            Lay.Row(t, Lay.Label(L.T("Адрес загрузки:")), url);
+            Lay.Row(t, Lay.Label(L.T("Метод:")), method);
+            Lay.Row(t, Lay.Label(L.T("Как отправлять:")), body);
+            Lay.Row(t, Lay.Label(L.T("Имя поля с файлом:")), field);
+            Lay.Row(t, Lay.Label(L.T("Заголовки:")), headers);
+            Lay.Row(t, new Label(), Lay.Hint(L.T("По строке: Имя: значение. Например  Authorization: Bearer ключ"), 380));
+            Lay.Row(t, Lay.Label(L.T("Доп. поля формы:")), args);
+            Lay.Row(t, new Label(), Lay.Hint(L.T("По строке: имя=значение. Например  reqtype=fileupload"), 380));
+            Lay.Row(t, Lay.Label(L.T("Ссылка в ответе:")), link);
+            Lay.Row(t, new Label(), Lay.Hint(L.T("Пусто — сервер отвечает просто ссылкой. Если отвечает JSON: {json:data.url} или {json:files[0].url}. Ещё можно {regex:https?://\\S+}."), 380));
+            Lay.Row(t, Lay.Label(L.T("Ссылка удаления:")), del);
+            Lay.Row(t, new Label(), Lay.Hint(L.T("Необязательно. Так же, например {json:data.delete_url}."), 380));
 
-            test = Lay.Button("Проверить", (o, e) => Test());
+            test = Lay.Button(L.T("Проверить"), (o, e) => Test());
             var ok = Lay.Button("OK", (o, e) => { Apply(U); DialogResult = DialogResult.OK; });
-            var cancel = Lay.Button("Отмена", null);
+            var cancel = Lay.Button(L.T("Отмена"), null);
             cancel.DialogResult = DialogResult.Cancel;
             var bottom = Lay.Table(2);
             bottom.Dock = DockStyle.Fill;
@@ -439,7 +440,7 @@ namespace Kadr
 
         void Apply(CustomUploader u)
         {
-            u.Name = string.IsNullOrWhiteSpace(name.Text) ? "Мой сервис" : name.Text.Trim();
+            u.Name = string.IsNullOrWhiteSpace(name.Text) ? L.T("Мой сервис") : name.Text.Trim();
             u.RequestURL = url.Text.Trim();
             u.Parameters = new Dictionary<string, string>();
             u.RequestMethod = (string)method.SelectedItem;
@@ -455,10 +456,10 @@ namespace Kadr
         {
             var u = new CustomUploader();
             Apply(u);
-            if (string.IsNullOrWhiteSpace(u.RequestURL)) { MessageBox.Show(this, "Сначала укажи адрес загрузки.", "Кадр"); return; }
-            if (MessageBox.Show(this, "Загрузить на " + u.RequestURL + " маленькую тестовую картинку?", "Проверка", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
+            if (string.IsNullOrWhiteSpace(u.RequestURL)) { MessageBox.Show(this, L.T("Сначала укажи адрес загрузки."), L.T("Кадр")); return; }
+            if (MessageBox.Show(this, L.F("Загрузить на {0} маленькую тестовую картинку?", u.RequestURL), L.T("Проверка"), MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
             test.Enabled = false;
-            test.Text = "Проверяю…";
+            test.Text = L.T("Проверяю…");
             try
             {
                 byte[] png;
@@ -467,22 +468,22 @@ namespace Kadr
                     using (var g = Graphics.FromImage(b))
                     {
                         g.Clear(Color.FromArgb(61, 90, 254));
-                        using (var f = new Font("Segoe UI", 20f, FontStyle.Bold, GraphicsUnit.Pixel)) g.DrawString("Кадр — тест", f, Brushes.White, 40, 24);
+                        using (var f = new Font("Segoe UI", 20f, FontStyle.Bold, GraphicsUnit.Pixel)) g.DrawString(L.T("Кадр — тест"), f, Brushes.White, 40, 24);
                     }
                     png = Imaging.Png(b);
                 }
                 var r = await Uploader.Custom(u, png, "kadr-test.png", "image/png");
-                var answer = MessageBox.Show(this, "Работает! Ссылка:\n" + r.Url + (r.DeleteUrl != null ? "\n\nСсылка удаления:\n" + r.DeleteUrl : "") + "\n\nОткрыть в браузере?", "Проверка", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+                var answer = MessageBox.Show(this, L.T("Работает! Ссылка:") + "\n" + r.Url + (r.DeleteUrl != null ? "\n\n" + L.T("Ссылка удаления:") + "\n" + r.DeleteUrl : "") + "\n\n" + L.T("Открыть в браузере?"), L.T("Проверка"), MessageBoxButtons.YesNo, MessageBoxIcon.Information);
                 if (answer == DialogResult.Yes) Shell.Open(r.Url);
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, "Не получилось: " + (ex is UserError ? ex.Message : ex.GetBaseException().Message), "Проверка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(this, L.T("Не получилось:") + " " + (ex is UserError ? ex.Message : ex.GetBaseException().Message), L.T("Проверка"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
             finally
             {
                 test.Enabled = true;
-                test.Text = "Проверить";
+                test.Text = L.T("Проверить");
             }
         }
     }
@@ -497,7 +498,7 @@ namespace Kadr
         public HistoryForm(Settings s)
         {
             S = s;
-            Text = "Кадр — история загрузок";
+            Text = L.T("Кадр — история загрузок");
             Font = UI.Font;
             Icon = AppIcon.Get(32);
             StartPosition = FormStartPosition.CenterScreen;
@@ -506,9 +507,9 @@ namespace Kadr
 
             thumbs = new ImageList { ColorDepth = ColorDepth.Depth32Bit, ImageSize = new Size(Math.Min(256, UI.S(64)), Math.Min(256, UI.S(40))) };
             view = new ListView { Dock = DockStyle.Fill, View = View.Details, FullRowSelect = true, SmallImageList = thumbs, HideSelection = false, BorderStyle = BorderStyle.None };
-            view.Columns.Add("Когда", UI.S(190));
-            view.Columns.Add("Куда", UI.S(90));
-            view.Columns.Add("Ссылка", UI.S(400));
+            view.Columns.Add(L.T("Когда"), UI.S(190));
+            view.Columns.Add(L.T("Куда"), UI.S(90));
+            view.Columns.Add(L.T("Ссылка"), UI.S(400));
             view.DoubleClick += (o, e) => { var it = Selected(); if (it != null) Shell.Open(it.Url); };
             view.KeyDown += (o, e) =>
             {
@@ -517,11 +518,11 @@ namespace Kadr
             };
 
             var menu = new ContextMenuStrip();
-            menu.Items.Add("Открыть", null, (o, e) => { var it = Selected(); if (it != null) Shell.Open(it.Url); });
-            menu.Items.Add("Копировать ссылку", null, (o, e) => { var it = Selected(); if (it != null) Clip.SetText(it.Url); });
-            var delServer = new ToolStripMenuItem("Удалить с сервера…", null, (o, e) => DeleteFromServer());
+            menu.Items.Add(L.T("Открыть"), null, (o, e) => { var it = Selected(); if (it != null) Shell.Open(it.Url); });
+            menu.Items.Add(L.T("Копировать ссылку"), null, (o, e) => { var it = Selected(); if (it != null) Clip.SetText(it.Url); });
+            var delServer = new ToolStripMenuItem(L.T("Удалить с сервера…"), null, (o, e) => DeleteFromServer());
             menu.Items.Add(delServer);
-            menu.Items.Add("Убрать из истории", null, (o, e) => RemoveSelected());
+            menu.Items.Add(L.T("Убрать из истории"), null, (o, e) => RemoveSelected());
             menu.Opening += (o, e) =>
             {
                 var it = Selected();
@@ -531,9 +532,9 @@ namespace Kadr
             view.ContextMenuStrip = menu;
 
             var bottom = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(UI.S(8)) };
-            bottom.Controls.Add(Lay.Button("Закрыть", (o, e) => Close()));
-            bottom.Controls.Add(Lay.Button("Очистить историю", (o, e) => ClearAll()));
-            var hint = Lay.Hint("Двойной щелчок — открыть, правая кнопка — копировать или удалить.", 400);
+            bottom.Controls.Add(Lay.Button(L.T("Закрыть"), (o, e) => Close()));
+            bottom.Controls.Add(Lay.Button(L.T("Очистить историю"), (o, e) => ClearAll()));
+            var hint = Lay.Hint(L.T("Двойной щелчок — открыть, правая кнопка — копировать или удалить."), 400);
             bottom.Controls.Add(hint);
 
             Controls.Add(view);
@@ -569,7 +570,7 @@ namespace Kadr
                     }
                     catch { }
                 }
-                var lv = new ListViewItem(it.Time.ToLocalTime().ToString("d MMMM yyyy, HH:mm"), img) { Tag = it };
+                var lv = new ListViewItem(it.Time.ToLocalTime().ToString("d MMMM yyyy, HH:mm", L.Culture), img) { Tag = it };
                 lv.SubItems.Add(it.Destination);
                 lv.SubItems.Add(it.Url);
                 view.Items.Add(lv);
@@ -598,29 +599,29 @@ namespace Kadr
             if (it == null) return;
             if (!string.IsNullOrEmpty(it.ImgurDeleteHash))
             {
-                if (MessageBox.Show(this, "Удалить картинку с Imgur? Ссылка перестанет открываться.\n\n" + it.Url, "Кадр", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
+                if (MessageBox.Show(this, L.T("Удалить картинку с Imgur? Ссылка перестанет открываться.") + "\n\n" + it.Url, L.T("Кадр"), MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
                 try
                 {
                     await Uploader.ImgurDelete(S.ImgurClientId, it.ImgurDeleteHash);
                     RemoveSelected();
-                    MessageBox.Show(this, "Удалено с Imgur.", "Кадр");
+                    MessageBox.Show(this, L.T("Удалено с Imgur."), L.T("Кадр"));
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show(this, "Не удалось удалить: " + (ex is UserError ? ex.Message : ex.GetBaseException().Message), "Кадр", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show(this, L.T("Не удалось удалить:") + " " + (ex is UserError ? ex.Message : ex.GetBaseException().Message), L.T("Кадр"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
                 return;
             }
             if (!string.IsNullOrEmpty(it.DeleteUrl))
             {
-                if (MessageBox.Show(this, "Открыть ссылку удаления в браузере?\n\n" + it.DeleteUrl, "Кадр", MessageBoxButtons.YesNo) == DialogResult.Yes)
+                if (MessageBox.Show(this, L.T("Открыть ссылку удаления в браузере?") + "\n\n" + it.DeleteUrl, L.T("Кадр"), MessageBoxButtons.YesNo) == DialogResult.Yes)
                     Shell.Open(it.DeleteUrl);
             }
         }
 
         void ClearAll()
         {
-            if (MessageBox.Show(this, "Очистить историю? Сами картинки на серверах останутся.", "Кадр", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+            if (MessageBox.Show(this, L.T("Очистить историю? Сами картинки на серверах останутся."), L.T("Кадр"), MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
             foreach (var it in History.Load()) History.DeleteThumb(it);
             History.Save(new List<HistoryItem>());
             Reload();

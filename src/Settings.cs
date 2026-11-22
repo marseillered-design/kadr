@@ -51,7 +51,7 @@ namespace Kadr
             if (string.IsNullOrEmpty(RequestMethod)) RequestMethod = "POST";
             if (string.IsNullOrEmpty(Body)) Body = "MultipartFormData";
             if (string.IsNullOrEmpty(FileFormName)) FileFormName = "file";
-            if (string.IsNullOrEmpty(Name)) Name = "Мой сервис";
+            if (string.IsNullOrEmpty(Name)) Name = L.T("Мой сервис");
         }
     }
 
@@ -81,6 +81,8 @@ namespace Kadr
         public int PenColor { get; set; }
         public int PenSize { get; set; }
         public List<CustomUploader> Uploaders { get; set; }
+        /// <summary>"ru", "uk", "en", "de", "fr", "es", "it"; empty = the Windows language.</summary>
+        public string Language { get; set; }
 
         public Settings()
         {
@@ -90,10 +92,11 @@ namespace Kadr
             AskFileName = true;
             HookPrintScreen = true;
             Hotkey = (int)(Keys.Shift | Keys.PageUp);
-            SaveFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "Кадр");
+            SaveFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), L.T("Кадр"));
             PenColor = Color.FromArgb(229, 57, 53).ToArgb();
             PenSize = 4;
             Uploaders = new List<CustomUploader>();
+            Language = "";
         }
 
         public static string Dir
@@ -115,7 +118,11 @@ namespace Kadr
             {
                 if (File.Exists(FilePath))
                 {
-                    var s = Json.Ser.Deserialize<Settings>(File.ReadAllText(FilePath, Encoding.UTF8));
+                    string raw = File.ReadAllText(FilePath, Encoding.UTF8);
+                    var s = Json.Ser.Deserialize<Settings>(raw);
+                    // Versions before the language choice were Russian only: keep them Russian.
+                    if (!raw.Contains("\"Language\"")) s.Language = "ru";
+                    L.Current = s.Language;
                     if (s.Uploaders == null) s.Uploaders = new List<CustomUploader>();
                     foreach (var u in s.Uploaders) u.Normalize();
                     if (s.PenSize < 1 || s.PenSize > 20) s.PenSize = 4;

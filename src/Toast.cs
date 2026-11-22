@@ -17,7 +17,9 @@ namespace Kadr
         Image thumb;
         string title, text;
         Action onClick;
-        string copyText;
+        string btnGlyph;
+        Action btnAction;
+        bool btnTick;
         bool copyHot, copied;
         bool busy, error;
         readonly float k;
@@ -99,7 +101,7 @@ namespace Kadr
 
         public void Done(string title, string text, Action onClick, bool error, int seconds = 7, string copyText = null)
         {
-            this.copyText = copyText;
+            if (copyText != null) { string c = copyText; btnGlyph = "\uE8C8"; btnAction = () => Clip.SetText(c); btnTick = true; }
             if (IsDisposed) return;
             busy = false;
             this.error = error;
@@ -140,7 +142,7 @@ namespace Kadr
             int right = CloseRect.Left - (int)(4 * k);
             var tr = new Rectangle(x, (int)(18 * k), right - x, (int)(22 * k));
             TextRenderer.DrawText(g, title, titleFont, tr, fg, TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.Left);
-            int textRight = copyText != null ? CopyRect.Left - (int)(6 * k) : Width - pad;
+            int textRight = btnGlyph != null ? CopyRect.Left - (int)(6 * k) : Width - pad;
             var sr = new Rectangle(x, (int)(44 * k), textRight - x, (int)(36 * k));
             TextRenderer.DrawText(g, text ?? "", textFont, sr, sub, TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.WordBreak | TextFormatFlags.Left);
 
@@ -148,7 +150,7 @@ namespace Kadr
             using (var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
                 g.DrawString("", glyphFont, b, CloseRect, sf);
 
-            if (copyText != null)
+            if (btnGlyph != null)
             {
                 var cr = CopyRect;
                 if (copyHot || copied)
@@ -157,7 +159,7 @@ namespace Kadr
                 Color gc = copied ? Color.FromArgb(67, 160, 71) : (dark ? Color.FromArgb(225, 225, 225) : Color.FromArgb(50, 50, 54));
                 using (var b = new SolidBrush(gc))
                 using (var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
-                    g.DrawString(copied ? "" : "", copyFont, b, cr, sf);
+                    g.DrawString(copied ? "\uE73E" : btnGlyph, copyFont, b, cr, sf);
             }
 
             if (busy)
@@ -175,14 +177,24 @@ namespace Kadr
         protected override void OnMouseMove(MouseEventArgs e)
         {
             base.OnMouseMove(e);
-            bool h = copyText != null && CopyRect.Contains(e.Location);
+            bool h = btnGlyph != null && CopyRect.Contains(e.Location);
             if (h != copyHot) { copyHot = h; Invalidate(); }
         }
 
-        /// <summary>Copies the link again without closing; the icon turns into a green tick for a moment.</summary>
-        void CopyAgain()
+        /// <summary>An icon button in the bottom-right corner (copy the link, open the folder…).</summary>
+        public void SetButton(string glyph, Action action, bool tickFeedback)
         {
-            Clip.SetText(copyText);
+            btnGlyph = glyph;
+            btnAction = action;
+            btnTick = tickFeedback;
+            Invalidate();
+        }
+
+        /// <summary>Runs the button; "copy" stays open and shows a green tick for a moment.</summary>
+        void PressButton()
+        {
+            btnAction();
+            if (!btnTick) { Close(); return; }
             copied = true;
             Invalidate();
             hide.Stop();
@@ -196,7 +208,7 @@ namespace Kadr
         {
             base.OnMouseClick(e);
             if (CloseRect.Contains(e.Location) || e.Button == MouseButtons.Right) { Close(); return; }
-            if (copyText != null && CopyRect.Contains(e.Location)) { CopyAgain(); return; }
+            if (btnGlyph != null && CopyRect.Contains(e.Location)) { PressButton(); return; }
             if (onClick != null) onClick();
             if (!busy) Close();
         }

@@ -107,14 +107,14 @@ namespace Kadr
     {
         public static async Task<UploadResult> Upload(Settings s, byte[] data, string fileName, string dest, Image thumbSource, bool isScreenshot)
         {
-            var toast = Toast.Show(thumbSource, "Загружаю в " + dest + "…", fileName);
+            var toast = Toast.Show(thumbSource, L.F("Загружаю в {0}…", dest), fileName);
             try
             {
                 var r = await Uploader.Upload(s, dest, data, fileName, Imaging.ContentType(fileName));
                 if (s.CopyLink) Clip.SetText(r.Url);
                 History.Add(new HistoryItem { Time = DateTime.Now, Destination = dest, Url = r.Url, DeleteUrl = r.DeleteUrl, ImgurDeleteHash = r.ImgurDeleteHash }, thumbSource);
                 string url = r.Url;
-                toast.Done(s.CopyLink ? "Ссылка скопирована" : "Загружено в " + dest, url, () => Shell.Open(url), false, 7, url);
+                toast.Done(s.CopyLink ? L.T("Ссылка скопирована") : L.F("Загружено в {0}", dest), url, () => Shell.Open(url), false, 7, url);
                 if (s.OpenInBrowser) Shell.Open(url);
                 return r;
             }
@@ -129,23 +129,23 @@ namespace Kadr
                         Directory.CreateDirectory(s.SaveFolder);
                         saved = Path.Combine(s.SaveFolder, Path.GetFileName(fileName));
                         File.WriteAllBytes(saved, data);
-                        msg += " Снимок сохранён в папку.";
+                        msg += " " + L.T("Снимок сохранён в папку.");
                     }
                     catch { saved = null; }
                 }
                 string savedPath = saved;
-                toast.Done("Не получилось загрузить", msg, savedPath == null ? (Action)null : () => Shell.ShowInFolder(savedPath), true, 15);
+                toast.Done(L.T("Не получилось загрузить"), msg, savedPath == null ? (Action)null : () => Shell.ShowInFolder(savedPath), true, 15);
                 return null;
             }
         }
 
         static string Describe(Exception ex)
         {
-            if (ex is TaskCanceledException) return "Сервер не ответил вовремя.";
+            if (ex is TaskCanceledException) return L.T("Сервер не ответил вовремя.");
             var e = ex;
             while (e.InnerException != null) e = e.InnerException;
             if (e is System.Net.WebException || e is System.Net.Sockets.SocketException || ex is System.Net.Http.HttpRequestException)
-                return "Нет связи с сервером (" + e.Message + ")";
+                return L.F("Нет связи с сервером ({0})", e.Message);
             return e.Message;
         }
 
@@ -166,15 +166,22 @@ namespace Kadr
                     if (!string.IsNullOrEmpty(dir)) { s.SaveFolder = dir; s.Save(); }
                 }
                 Imaging.SaveFile(bmp, path);
+                Saved(bmp, path);
             }
             else
             {
                 Directory.CreateDirectory(s.SaveFolder);
                 path = Path.Combine(s.SaveFolder, name);
                 Imaging.SaveFile(bmp, path);
-                string p = path;
-                Toast.Info(bmp, "Снимок сохранён", path, () => Shell.ShowInFolder(p));
+                Saved(bmp, path);
             }
+        }
+
+        /// <summary>"Saved" notice: a click opens the picture, the folder button shows it in Explorer.</summary>
+        static void Saved(Bitmap bmp, string path)
+        {
+            var t = Toast.Info(bmp, L.T("Снимок сохранён"), path, () => Shell.Open(path), 8);
+            t.SetButton("\uE838", () => Shell.ShowInFolder(path), false);
         }
 
         public static async Task UploadFiles(Settings s, IEnumerable<string> files, string dest)
@@ -191,7 +198,7 @@ namespace Kadr
                 }
                 catch (Exception ex)
                 {
-                    Toast.Info(null, "Не открылся файл", Path.GetFileName(f) + ": " + ex.Message, null, 10);
+                    Toast.Info(null, L.T("Не открылся файл"), Path.GetFileName(f) + ": " + ex.Message, null, 10);
                     continue;
                 }
                 var r = await Upload(s, data, Path.GetFileName(f), dest, thumb, false);
@@ -201,7 +208,7 @@ namespace Kadr
             if (links.Count > 1 && s.CopyLink)
             {
                 Clip.SetText(string.Join(Environment.NewLine, links));
-                Toast.Info(null, "Все ссылки скопированы", links.Count + " шт., каждая с новой строки", null);
+                Toast.Info(null, L.T("Все ссылки скопированы"), L.F("{0} шт., каждая с новой строки", links.Count), null);
             }
         }
 
@@ -217,7 +224,7 @@ namespace Kadr
         CaptureForm capture;
         SettingsForm settingsForm;
         HistoryForm historyForm;
-        readonly ToolStripMenuItem destMenu, shotItem, fullItem;
+        ToolStripMenuItem destMenu, shotItem, fullItem;
 
         public TrayApp(EventWaitHandle captureSignal, bool quiet)
         {
@@ -225,29 +232,11 @@ namespace Kadr
             ui = new Control();
             var h = ui.Handle;
 
-            var menu = new ContextMenuStrip { Font = new Font("Segoe UI", 9.5f) };
-            shotItem = new ToolStripMenuItem("Сделать снимок", null, (s, e) => StartCapture(false));
-            shotItem.Font = new Font(menu.Font, FontStyle.Bold);
-            menu.Items.Add(shotItem);
-            fullItem = new ToolStripMenuItem("Снимок экрана целиком", null, (s, e) => StartCapture(true));
-            menu.Items.Add(fullItem);
-            menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add(new ToolStripMenuItem("Загрузить картинку с компьютера…", null, (s, e) => UploadFromDisk()));
-            menu.Items.Add(new ToolStripMenuItem("Загрузить картинку из буфера", null, (s, e) => UploadFromClipboard()));
-            destMenu = new ToolStripMenuItem("Куда загружать");
-            menu.Items.Add(destMenu);
-            menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add(new ToolStripMenuItem("История загрузок", null, (s, e) => ShowHistory()));
-            menu.Items.Add(new ToolStripMenuItem("Настройки", null, (s, e) => ShowSettings()));
-            menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add(new ToolStripMenuItem("Выход", null, (s, e) => Quit()));
-            menu.Opening += (s, e) => FillDestinations();
-
             tray = new NotifyIcon
             {
                 Icon = AppIcon.Get(SystemInformation.SmallIconSize.Width),
-                Text = "Кадр",
-                ContextMenuStrip = menu,
+                Text = L.T("Кадр"),
+                ContextMenuStrip = BuildMenu(),
                 Visible = true
             };
             tray.MouseUp += (s, e) => { if (e.Button == MouseButtons.Left) StartCapture(false); };
@@ -268,10 +257,33 @@ namespace Kadr
             if (Settings.FirstRun)
             {
                 S.Save();
-                Toast.Info(null, "Кадр запущен", "Нажми " + Settings.KeyText(S.Hotkey) + ", чтобы сделать снимок. Настройки — в значке у часов.", null, 10);
+                Toast.Info(null, L.T("Кадр запущен"), L.F("Нажми {0}, чтобы сделать снимок. Настройки — в значке у часов.", Settings.KeyText(S.Hotkey)), null, 10);
             }
             else if (!quiet)
-                Toast.Info(null, "Кадр работает", S.HookPrintScreen ? Settings.KeyText(S.Hotkey) + " — снимок экрана." : "Снимок — щелчок по значку у часов.", null, 5);
+                Toast.Info(null, L.T("Кадр работает"), S.HookPrintScreen ? L.F("{0} — снимок экрана.", Settings.KeyText(S.Hotkey)) : L.T("Снимок — щелчок по значку у часов."), null, 5);
+        }
+
+        ContextMenuStrip BuildMenu()
+        {
+            var menu = new ContextMenuStrip { Font = new Font("Segoe UI", 9.5f) };
+            shotItem = new ToolStripMenuItem(L.T("Сделать снимок"), null, (s, e) => StartCapture(false));
+            shotItem.Font = new Font(menu.Font, FontStyle.Bold);
+            menu.Items.Add(shotItem);
+            fullItem = new ToolStripMenuItem(L.T("Снимок экрана целиком"), null, (s, e) => StartCapture(true));
+            menu.Items.Add(fullItem);
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add(new ToolStripMenuItem(L.T("Загрузить картинку с компьютера…"), null, (s, e) => UploadFromDisk()));
+            menu.Items.Add(new ToolStripMenuItem(L.T("Загрузить картинку из буфера"), null, (s, e) => UploadFromClipboard()));
+            destMenu = new ToolStripMenuItem(L.T("Куда загружать"));
+            menu.Items.Add(destMenu);
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add(new ToolStripMenuItem(L.T("История загрузок"), null, (s, e) => ShowHistory()));
+            menu.Items.Add(new ToolStripMenuItem(L.T("Настройки"), null, (s, e) => ShowSettings()));
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add(new ToolStripMenuItem(L.T("Выход"), null, (s, e) => Quit()));
+            menu.Opening += (s, e) => FillDestinations();
+            return menu;
+
         }
 
         void ApplyHook()
@@ -282,7 +294,7 @@ namespace Kadr
             bool plainPrtScn = S.Hotkey == (int)Keys.PrintScreen;
             shotItem.ShortcutKeyDisplayString = S.HookPrintScreen ? key : "";
             fullItem.ShortcutKeyDisplayString = S.HookPrintScreen && plainPrtScn ? "Shift+PrtScn" : "";
-            tray.Text = S.HookPrintScreen ? "Кадр — снимок по " + key : "Кадр — щёлкни для снимка";
+            tray.Text = S.HookPrintScreen ? L.F("Кадр — снимок по {0}", key) : L.T("Кадр — щёлкни для снимка");
         }
 
         void FillDestinations()
@@ -296,7 +308,7 @@ namespace Kadr
                 destMenu.DropDownItems.Add(item);
             }
             destMenu.DropDownItems.Add(new ToolStripSeparator());
-            destMenu.DropDownItems.Add(new ToolStripMenuItem("Добавить свой сервис…", null, (s, e) => ShowSettings()));
+            destMenu.DropDownItems.Add(new ToolStripMenuItem(L.T("Добавить свой сервис…"), null, (s, e) => ShowSettings()));
         }
 
         public void StartCapture(bool fullScreen)
@@ -312,7 +324,7 @@ namespace Kadr
             }
             catch (Exception ex)
             {
-                Toast.Info(null, "Не удалось снять экран", ex.Message, null, 8);
+                Toast.Info(null, L.T("Не удалось снять экран"), ex.Message, null, 8);
                 return;
             }
             Rectangle? init = null;
@@ -369,7 +381,7 @@ namespace Kadr
                     break;
                 case "save":
                     try { Actions.Save(S, bmp); }
-                    catch (Exception ex) { Toast.Info(null, "Не удалось сохранить", ex.Message, null, 10); }
+                    catch (Exception ex) { Toast.Info(null, L.T("Не удалось сохранить"), ex.Message, null, 10); }
                     bmp.Dispose();
                     break;
                 case "upload":
@@ -389,8 +401,8 @@ namespace Kadr
         {
             using (var d = new OpenFileDialog())
             {
-                d.Title = "Какие картинки загрузить в " + S.Default() + "?";
-                d.Filter = "Картинки|" + string.Join(";", Actions.ImageFilter) + "|Все файлы|*.*";
+                d.Title = L.F("Какие картинки загрузить в {0}?", S.Default());
+                d.Filter = L.T("Картинки") + "|" + string.Join(";", Actions.ImageFilter) + "|" + L.T("Все файлы") + "|*.*";
                 d.Multiselect = true;
                 if (d.ShowDialog() != DialogResult.OK) return;
                 await Actions.UploadFiles(S, d.FileNames, S.Default());
@@ -413,11 +425,11 @@ namespace Kadr
                         await Actions.Upload(S, Imaging.Png(bmp), Imaging.ShotName(".png"), S.Default(), bmp, true);
                     return;
                 }
-                Toast.Info(null, "В буфере нет картинки", "Скопируй картинку или файл и попробуй ещё раз.", null);
+                Toast.Info(null, L.T("В буфере нет картинки"), L.T("Скопируй картинку или файл и попробуй ещё раз."), null);
             }
             catch (Exception ex)
             {
-                Toast.Info(null, "Не удалось прочитать буфер", ex.Message, null, 8);
+                Toast.Info(null, L.T("Не удалось прочитать буфер"), ex.Message, null, 8);
             }
         }
 
@@ -428,7 +440,14 @@ namespace Kadr
             settingsForm = new SettingsForm(S);
             settingsForm.FormClosed += (s, e) =>
             {
+                var f = (SettingsForm)s;
                 settingsForm = null;
+                if (f.LanguageChanged)
+                {
+                    var old = tray.ContextMenuStrip;
+                    tray.ContextMenuStrip = BuildMenu();
+                    old.Dispose();
+                }
                 ApplyHook();
             };
             settingsForm.Show();
