@@ -143,6 +143,7 @@ namespace Kadr
             Lay.Row(up, Lay.Label("Imgur Client ID:"), Lay.Flow(imgurId, howTo));
             copyLink = Lay.Check("Копировать ссылку после загрузки", s.CopyLink);
             openBrowser = Lay.Check("Открывать ссылку в браузере", s.OpenInBrowser);
+            Lay.Row(up, new Label(), Lay.Hint("Catbox работает без регистрации, ссылки вечные. Для Imgur нужен Client ID.", 300));
             Lay.Row(up, copyLink);
             Lay.Row(up, openBrowser);
             root.Controls.Add(Lay.Group("Загрузка", up));
@@ -194,9 +195,10 @@ namespace Kadr
             list.Items.Clear();
             foreach (var u in ups) list.Items.Add(u.Name + "   —   " + Host(u.RequestURL));
             dest.Items.Clear();
+            dest.Items.Add(Settings.Catbox);
             dest.Items.Add(Settings.Imgur);
             foreach (var u in ups) if (!dest.Items.Contains(u.Name)) dest.Items.Add(u.Name);
-            dest.SelectedItem = dest.Items.Contains(selectedDest) ? selectedDest : Settings.Imgur;
+            dest.SelectedItem = dest.Items.Contains(selectedDest) ? selectedDest : Settings.Catbox;
         }
 
         static string Host(string url)
@@ -205,7 +207,7 @@ namespace Kadr
             return Uri.TryCreate(url ?? "", UriKind.Absolute, out u) ? u.Host : "адрес не указан";
         }
 
-        string CurrentDest { get { return dest.SelectedItem as string ?? Settings.Imgur; } }
+        string CurrentDest { get { return dest.SelectedItem as string ?? Settings.Catbox; } }
 
         void AddNew()
         {
@@ -266,7 +268,7 @@ namespace Kadr
         string UniqueName(string name, int except = -1)
         {
             string n = string.IsNullOrWhiteSpace(name) ? "Мой сервис" : name.Trim();
-            if (n == Settings.Imgur) n += " (свой)";
+            if (n == Settings.Imgur || n == Settings.Catbox) n += " (свой)";
             string candidate = n;
             int k = 2;
             while (ups.Where((u, i) => i != except).Any(u => u.Name == candidate)) candidate = n + " " + k++;

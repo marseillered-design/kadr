@@ -37,6 +37,7 @@ namespace Kadr
         public static Task<UploadResult> Upload(Settings s, string destination, byte[] data, string fileName, string contentType)
         {
             if (destination == Settings.Imgur) return Imgur(s.ImgurClientId, data, fileName, contentType);
+            if (destination == Settings.Catbox) return Custom(Settings.CatboxConfig(), data, fileName, contentType);
             var u = s.Uploaders.FirstOrDefault(x => x.Name == destination);
             if (u == null) throw new UserError("Сервис «" + destination + "» не найден в настройках.");
             return Custom(u, data, fileName, contentType);
@@ -47,7 +48,7 @@ namespace Kadr
         public static async Task<UploadResult> Imgur(string clientId, byte[] data, string fileName, string contentType)
         {
             if (string.IsNullOrWhiteSpace(clientId))
-                throw new UserError("Для Imgur нужен Client ID. Открой «Настройки» в меню значка Кадра.");
+                throw new UserError("Для Imgur нужен Client ID (Настройки в меню значка Кадра). Без регистрации работает Catbox: стрелка ▾ рядом с кнопкой загрузки.");
 
             var form = new MultipartFormDataContent();
             var file = new ByteArrayContent(data);
