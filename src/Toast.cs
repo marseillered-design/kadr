@@ -17,6 +17,8 @@ namespace Kadr
         Image thumb;
         string title, text;
         Action onClick;
+        string copyText;
+        bool copyHot, copied;
         bool busy, error;
         readonly float k;
         readonly Timer anim = new Timer { Interval = 30 };
@@ -24,7 +26,7 @@ namespace Kadr
         int phase;
         bool hot;
         readonly bool dark = Shell.DarkMode;
-        readonly Font titleFont, textFont, glyphFont;
+        readonly Font titleFont, textFont, glyphFont, copyFont;
 
         Toast(Image thumbSource, string title, string text)
         {
@@ -36,6 +38,7 @@ namespace Kadr
             titleFont = new Font("Segoe UI Semibold", 14f * k, GraphicsUnit.Pixel);
             textFont = new Font("Segoe UI", 12.5f * k, GraphicsUnit.Pixel);
             glyphFont = new Font(UI.IconFont, 10f * k, GraphicsUnit.Pixel);
+            copyFont = new Font(UI.IconFont, 15f * k, GraphicsUnit.Pixel);
 
             FormBorderStyle = FormBorderStyle.None;
             ShowInTaskbar = false;
@@ -94,8 +97,9 @@ namespace Kadr
             Location = new Point(wa.Right - Width - gap, y);
         }
 
-        public void Done(string title, string text, Action onClick, bool error, int seconds = 7)
+        public void Done(string title, string text, Action onClick, bool error, int seconds = 7, string copyText = null)
         {
+            this.copyText = copyText;
             if (IsDisposed) return;
             busy = false;
             this.error = error;
@@ -107,6 +111,8 @@ namespace Kadr
             hide.Start();
             Invalidate();
         }
+
+        Rectangle CopyRect { get { int s = (int)(34 * k); return new Rectangle(Width - s - (int)(10 * k), Height - s - (int)(10 * k), s, s); } }
 
         Rectangle CloseRect { get { int s = (int)(22 * k); return new Rectangle(Width - s - (int)(6 * k), (int)(6 * k), s, s); } }
 
@@ -134,12 +140,25 @@ namespace Kadr
             int right = CloseRect.Left - (int)(4 * k);
             var tr = new Rectangle(x, (int)(18 * k), right - x, (int)(22 * k));
             TextRenderer.DrawText(g, title, titleFont, tr, fg, TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.Left);
-            var sr = new Rectangle(x, (int)(44 * k), Width - x - pad, (int)(36 * k));
+            int textRight = copyText != null ? CopyRect.Left - (int)(6 * k) : Width - pad;
+            var sr = new Rectangle(x, (int)(44 * k), textRight - x, (int)(36 * k));
             TextRenderer.DrawText(g, text ?? "", textFont, sr, sub, TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.WordBreak | TextFormatFlags.Left);
 
             using (var b = new SolidBrush(dark ? Color.FromArgb(170, 170, 170) : Color.FromArgb(120, 120, 120)))
             using (var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
                 g.DrawString("", glyphFont, b, CloseRect, sf);
+
+            if (copyText != null)
+            {
+                var cr = CopyRect;
+                if (copyHot || copied)
+                    using (var path = UI.Round(cr, 6 * k))
+                    using (var hb = new SolidBrush(dark ? Color.FromArgb(62, 62, 66) : Color.FromArgb(234, 236, 240))) g.FillPath(hb, path);
+                Color gc = copied ? Color.FromArgb(67, 160, 71) : (dark ? Color.FromArgb(225, 225, 225) : Color.FromArgb(50, 50, 54));
+                using (var b = new SolidBrush(gc))
+                using (var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+                    g.DrawString(copied ? "" : "", copyFont, b, cr, sf);
+            }
 
             if (busy)
             {
@@ -151,12 +170,33 @@ namespace Kadr
         }
 
         protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); hot = true; }
-        protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); hot = false; }
+        protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); hot = false; if (copyHot) { copyHot = false; Invalidate(); } }
+
+        protected override void OnMouseMove(MouseEventArgs e)
+        {
+            base.OnMouseMove(e);
+            bool h = copyText != null && CopyRect.Contains(e.Location);
+            if (h != copyHot) { copyHot = h; Invalidate(); }
+        }
+
+        /// <summary>Copies the link again without closing; the icon turns into a green tick for a moment.</summary>
+        void CopyAgain()
+        {
+            Clip.SetText(copyText);
+            copied = true;
+            Invalidate();
+            hide.Stop();
+            hide.Start();
+            var t = new Timer { Interval = 1500 };
+            t.Tick += (s, e) => { t.Dispose(); copied = false; if (!IsDisposed) Invalidate(); };
+            t.Start();
+        }
 
         protected override void OnMouseClick(MouseEventArgs e)
         {
             base.OnMouseClick(e);
             if (CloseRect.Contains(e.Location) || e.Button == MouseButtons.Right) { Close(); return; }
+            if (copyText != null && CopyRect.Contains(e.Location)) { CopyAgain(); return; }
             if (onClick != null) onClick();
             if (!busy) Close();
         }

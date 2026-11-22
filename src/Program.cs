@@ -136,7 +136,7 @@ namespace Kadr
             snap(new UploaderForm(s.Uploaders[0]), "uploader.png");
             snap(new HistoryForm(s), "history.png");
             var t = Toast.Show(FakeScreen(800, 450), "Ссылка скопирована", "https://i.imgur.com/AbCdEf1.png");
-            t.Done("Ссылка скопирована", "https://i.imgur.com/AbCdEf1.png", null, false);
+            t.Done("Ссылка скопирована", "https://files.catbox.moe/gmn4ey.png", null, false, 7, "https://files.catbox.moe/gmn4ey.png");
             Application.DoEvents();
             using (var b = new Bitmap(t.Width, t.Height))
             {

@@ -114,7 +114,7 @@ namespace Kadr
                 if (s.CopyLink) Clip.SetText(r.Url);
                 History.Add(new HistoryItem { Time = DateTime.Now, Destination = dest, Url = r.Url, DeleteUrl = r.DeleteUrl, ImgurDeleteHash = r.ImgurDeleteHash }, thumbSource);
                 string url = r.Url;
-                toast.Done(s.CopyLink ? "Ссылка скопирована" : "Загружено в " + dest, url, () => Shell.Open(url), false);
+                toast.Done(s.CopyLink ? "Ссылка скопирована" : "Загружено в " + dest, url, () => Shell.Open(url), false, 7, url);
                 if (s.OpenInBrowser) Shell.Open(url);
                 return r;
             }
