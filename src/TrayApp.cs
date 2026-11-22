@@ -1,0 +1,455 @@
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Imaging;
+using System.IO;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace Kadr
+{
+    /// <summary>Watches PrtScn on its own thread so a busy UI never delays the keyboard.</summary>
+    class KeyboardHook
+    {
+        public event Action<bool> PrintScreen;
+        Thread thread;
+        uint threadId;
+        IntPtr hook;
+        Native.LowLevelKeyboardProc proc;
+        bool downSeen;
+
+        public void Start()
+        {
+            if (thread != null) return;
+            var ready = new ManualResetEvent(false);
+            thread = new Thread(() =>
+            {
+                threadId = Native.GetCurrentThreadId();
+                proc = Callback;
+                hook = Native.SetWindowsHookEx(Native.WH_KEYBOARD_LL, proc, Native.GetModuleHandle(null), 0);
+                ready.Set();
+                Native.MSG msg;
+                while (Native.GetMessage(out msg, IntPtr.Zero, 0, 0) > 0)
+                {
+                    Native.TranslateMessage(ref msg);
+                    Native.DispatchMessage(ref msg);
+                }
+                if (hook != IntPtr.Zero) Native.UnhookWindowsHookEx(hook);
+                hook = IntPtr.Zero;
+            }) { IsBackground = true, Name = "Kadr keyboard" };
+            thread.Start();
+            ready.WaitOne(2000);
+        }
+
+        public void Stop()
+        {
+            if (thread == null) return;
+            Native.PostThreadMessage(threadId, Native.WM_QUIT, IntPtr.Zero, IntPtr.Zero);
+            thread.Join(1000);
+            thread = null;
+        }
+
+        IntPtr Callback(int nCode, IntPtr wParam, IntPtr lParam)
+        {
+            if (nCode >= 0)
+            {
+                int vk = System.Runtime.InteropServices.Marshal.ReadInt32(lParam);
+                if (vk == 0x2C)
+                {
+                    int flags = System.Runtime.InteropServices.Marshal.ReadInt32(lParam, 8);
+                    bool alt = (flags & 0x20) != 0;
+                    bool ctrl = (Native.GetAsyncKeyState(0x11) & 0x8000) != 0;
+                    bool win = (Native.GetAsyncKeyState(0x5B) & 0x8000) != 0 || (Native.GetAsyncKeyState(0x5C) & 0x8000) != 0;
+                    if (!alt && !ctrl && !win)
+                    {
+                        bool shift = (Native.GetAsyncKeyState(0x10) & 0x8000) != 0;
+                        int m = wParam.ToInt32();
+                        bool isDown = m == Native.WM_KEYDOWN || m == Native.WM_SYSKEYDOWN;
+                        if (isDown)
+                        {
+                            if (!downSeen) { downSeen = true; Fire(shift); }
+                        }
+                        else
+                        {
+                            if (!downSeen) Fire(shift);
+                            downSeen = false;
+                        }
+                        return (IntPtr)1;
+                    }
+                }
+            }
+            return Native.CallNextHookEx(hook, nCode, wParam, lParam);
+        }
+
+        void Fire(bool shift)
+        {
+            var h = PrintScreen;
+            if (h != null) h(shift);
+        }
+    }
+
+    /// <summary>Upload and save steps shared by the tray app and the "Send to" mode.</summary>
+    static class Actions
+    {
+        public static async Task<UploadResult> Upload(Settings s, byte[] data, string fileName, string dest, Image thumbSource, bool isScreenshot)
+        {
+            var toast = Toast.Show(thumbSource, "Загружаю в " + dest + "…", fileName);
+            try
+            {
+                var r = await Uploader.Upload(s, dest, data, fileName, Imaging.ContentType(fileName));
+                if (s.CopyLink) Clip.SetText(r.Url);
+                History.Add(new HistoryItem { Time = DateTime.Now, Destination = dest, Url = r.Url, DeleteUrl = r.DeleteUrl, ImgurDeleteHash = r.ImgurDeleteHash }, thumbSource);
+                string url = r.Url;
+                toast.Done(s.CopyLink ? "Ссылка скопирована" : "Загружено в " + dest, url, () => Shell.Open(url), false);
+                if (s.OpenInBrowser) Shell.Open(url);
+                return r;
+            }
+            catch (Exception ex)
+            {
+                string msg = ex is UserError ? ex.Message : Describe(ex);
+                string saved = null;
+                if (isScreenshot)
+                {
+                    try
+                    {
+                        Directory.CreateDirectory(s.SaveFolder);
+                        saved = Path.Combine(s.SaveFolder, Path.GetFileName(fileName));
+                        File.WriteAllBytes(saved, data);
+                        msg += " Снимок сохранён в папку.";
+                    }
+                    catch { saved = null; }
+                }
+                string savedPath = saved;
+                toast.Done("Не получилось загрузить", msg, savedPath == null ? (Action)null : () => Shell.ShowInFolder(savedPath), true, 15);
+                return null;
+            }
+        }
+
+        static string Describe(Exception ex)
+        {
+            if (ex is TaskCanceledException) return "Сервер не ответил вовремя.";
+            var e = ex;
+            while (e.InnerException != null) e = e.InnerException;
+            if (e is System.Net.WebException || e is System.Net.Sockets.SocketException || ex is System.Net.Http.HttpRequestException)
+                return "Нет связи с сервером (" + e.Message + ")";
+            return e.Message;
+        }
+
+        public static void Save(Settings s, Bitmap bmp)
+        {
+            string name = Imaging.ShotName(".png");
+            string path;
+            if (s.AskFileName)
+            {
+                using (var d = new SaveFileDialog())
+                {
+                    d.Filter = "PNG|*.png|JPEG|*.jpg";
+                    d.FileName = name;
+                    try { Directory.CreateDirectory(s.SaveFolder); d.InitialDirectory = s.SaveFolder; } catch { }
+                    if (d.ShowDialog() != DialogResult.OK) return;
+                    path = d.FileName;
+                    string dir = Path.GetDirectoryName(path);
+                    if (!string.IsNullOrEmpty(dir)) { s.SaveFolder = dir; s.Save(); }
+                }
+                Imaging.SaveFile(bmp, path);
+            }
+            else
+            {
+                Directory.CreateDirectory(s.SaveFolder);
+                path = Path.Combine(s.SaveFolder, name);
+                Imaging.SaveFile(bmp, path);
+                string p = path;
+                Toast.Info(bmp, "Снимок сохранён", path, () => Shell.ShowInFolder(p));
+            }
+        }
+
+        public static async Task UploadFiles(Settings s, IEnumerable<string> files, string dest)
+        {
+            var links = new List<string>();
+            foreach (var f in files)
+            {
+                byte[] data;
+                Image thumb = null;
+                try
+                {
+                    data = File.ReadAllBytes(f);
+                    try { using (var ms = new MemoryStream(data)) using (var img = Image.FromStream(ms)) thumb = Imaging.Fit(img, 400, 300); } catch { }
+                }
+                catch (Exception ex)
+                {
+                    Toast.Info(null, "Не открылся файл", Path.GetFileName(f) + ": " + ex.Message, null, 10);
+                    continue;
+                }
+                var r = await Upload(s, data, Path.GetFileName(f), dest, thumb, false);
+                if (thumb != null) thumb.Dispose();
+                if (r != null) links.Add(r.Url);
+            }
+            if (links.Count > 1 && s.CopyLink)
+            {
+                Clip.SetText(string.Join(Environment.NewLine, links));
+                Toast.Info(null, "Все ссылки скопированы", links.Count + " шт., каждая с новой строки", null);
+            }
+        }
+
+        public static string[] ImageFilter = { "*.png", "*.jpg", "*.jpeg", "*.gif", "*.webp", "*.bmp" };
+    }
+
+    class TrayApp : ApplicationContext
+    {
+        readonly Settings S;
+        readonly NotifyIcon tray;
+        readonly KeyboardHook hook = new KeyboardHook();
+        readonly Control ui;
+        CaptureForm capture;
+        SettingsForm settingsForm;
+        HistoryForm historyForm;
+        readonly ToolStripMenuItem destMenu;
+
+        public TrayApp(EventWaitHandle captureSignal, bool quiet)
+        {
+            S = Settings.Load();
+            ui = new Control();
+            var h = ui.Handle;
+
+            var menu = new ContextMenuStrip { Font = new Font("Segoe UI", 9.5f) };
+            var shotItem = new ToolStripMenuItem("Сделать снимок", null, (s, e) => StartCapture(false)) { ShortcutKeyDisplayString = "PrtScn" };
+            shotItem.Font = new Font(menu.Font, FontStyle.Bold);
+            menu.Items.Add(shotItem);
+            menu.Items.Add(new ToolStripMenuItem("Снимок экрана целиком", null, (s, e) => StartCapture(true)) { ShortcutKeyDisplayString = "Shift+PrtScn" });
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add(new ToolStripMenuItem("Загрузить картинку с компьютера…", null, (s, e) => UploadFromDisk()));
+            menu.Items.Add(new ToolStripMenuItem("Загрузить картинку из буфера", null, (s, e) => UploadFromClipboard()));
+            destMenu = new ToolStripMenuItem("Куда загружать");
+            menu.Items.Add(destMenu);
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add(new ToolStripMenuItem("История загрузок", null, (s, e) => ShowHistory()));
+            menu.Items.Add(new ToolStripMenuItem("Настройки", null, (s, e) => ShowSettings()));
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add(new ToolStripMenuItem("Выход", null, (s, e) => Quit()));
+            menu.Opening += (s, e) => FillDestinations();
+
+            tray = new NotifyIcon
+            {
+                Icon = AppIcon.Get(SystemInformation.SmallIconSize.Width),
+                Text = "Кадр — снимок экрана по PrtScn",
+                ContextMenuStrip = menu,
+                Visible = true
+            };
+            tray.MouseUp += (s, e) => { if (e.Button == MouseButtons.Left) StartCapture(false); };
+
+            hook.PrintScreen += shift => ui.BeginInvoke((Action)(() => StartCapture(shift)));
+            ApplyHook();
+
+            var listener = new Thread(() =>
+            {
+                while (true)
+                {
+                    captureSignal.WaitOne();
+                    try { ui.BeginInvoke((Action)(() => StartCapture(false))); } catch { return; }
+                }
+            }) { IsBackground = true };
+            listener.Start();
+
+            if (Settings.FirstRun)
+            {
+                S.Save();
+                Toast.Info(null, "Кадр запущен", "Нажми PrtScn, чтобы сделать снимок. Настройки — в значке у часов.", null, 10);
+            }
+            else if (!quiet)
+                Toast.Info(null, "Кадр работает", "PrtScn — снимок области, Shift+PrtScn — весь экран.", null, 5);
+        }
+
+        void ApplyHook()
+        {
+            if (S.HookPrintScreen) hook.Start(); else hook.Stop();
+        }
+
+        void FillDestinations()
+        {
+            destMenu.DropDownItems.Clear();
+            foreach (var d in S.Destinations())
+            {
+                string dest = d;
+                var item = new ToolStripMenuItem(d) { Checked = d == S.Default() };
+                item.Click += (s, e) => { S.DefaultDestination = dest; S.Save(); };
+                destMenu.DropDownItems.Add(item);
+            }
+            destMenu.DropDownItems.Add(new ToolStripSeparator());
+            destMenu.DropDownItems.Add(new ToolStripMenuItem("Добавить свой сервис…", null, (s, e) => ShowSettings()));
+        }
+
+        public void StartCapture(bool fullScreen)
+        {
+            if (capture != null) { capture.Activate(); return; }
+            Rectangle vs = SystemInformation.VirtualScreen;
+            Bitmap bmp;
+            try
+            {
+                bmp = new Bitmap(vs.Width, vs.Height, PixelFormat.Format32bppPArgb);
+                using (var g = Graphics.FromImage(bmp))
+                    g.CopyFromScreen(vs.Location, Point.Empty, vs.Size, CopyPixelOperation.SourceCopy);
+            }
+            catch (Exception ex)
+            {
+                Toast.Info(null, "Не удалось снять экран", ex.Message, null, 8);
+                return;
+            }
+            Rectangle? init = null;
+            if (fullScreen)
+            {
+                var b = Screen.FromPoint(Cursor.Position).Bounds;
+                b.Offset(-vs.X, -vs.Y);
+                init = b;
+            }
+            capture = new CaptureForm(S, bmp, vs, init, S.Destinations());
+            capture.FormClosed += OnCaptureClosed;
+            capture.Show();
+            SelfTest(capture, vs);
+        }
+
+        /// <summary>Build-time check only: with KADR_SELFTEST set, saves what the overlay shows and closes it.</summary>
+        static void SelfTest(CaptureForm f, Rectangle vs)
+        {
+            string dir = Environment.GetEnvironmentVariable("KADR_SELFTEST");
+            if (string.IsNullOrEmpty(dir)) return;
+            var t = new System.Windows.Forms.Timer { Interval = 1500 };
+            t.Tick += (s, e) =>
+            {
+                t.Dispose();
+                try
+                {
+                    using (var b = new Bitmap(f.Width, f.Height))
+                    {
+                        f.DrawToBitmap(b, new Rectangle(0, 0, f.Width, f.Height));
+                        using (var small = Imaging.Fit(b, 1600, 1600)) small.Save(Path.Combine(dir, "overlay-live.png"), ImageFormat.Png);
+                    }
+                    var info = "virtual=" + vs + " form=" + f.Bounds + " active=" + (Form.ActiveForm == f) +
+                               " screens=" + string.Join(";", Screen.AllScreens.Select(sc => sc.Bounds + "@" + Native.ScaleAt(sc.Bounds.Location)));
+                    File.WriteAllText(Path.Combine(dir, "overlay-live.txt"), info);
+                }
+                catch (Exception ex) { File.WriteAllText(Path.Combine(dir, "overlay-live.txt"), ex.ToString()); }
+                f.Close();
+            };
+            t.Start();
+        }
+
+        void OnCaptureClosed(object sender, FormClosedEventArgs e)
+        {
+            var f = capture;
+            capture = null;
+            S.Save();
+            var bmp = f.Output;
+            if (bmp == null) return;
+            switch (f.Action)
+            {
+                case "copy":
+                    Clip.SetImage(bmp);
+                    bmp.Dispose();
+                    break;
+                case "save":
+                    try { Actions.Save(S, bmp); }
+                    catch (Exception ex) { Toast.Info(null, "Не удалось сохранить", ex.Message, null, 10); }
+                    bmp.Dispose();
+                    break;
+                case "upload":
+                    UploadShot(bmp, f.Destination ?? S.Default());
+                    break;
+            }
+        }
+
+        async void UploadShot(Bitmap bmp, string dest)
+        {
+            byte[] png = Imaging.Png(bmp);
+            await Actions.Upload(S, png, Imaging.ShotName(".png"), dest, bmp, true);
+            bmp.Dispose();
+        }
+
+        async void UploadFromDisk()
+        {
+            using (var d = new OpenFileDialog())
+            {
+                d.Title = "Какие картинки загрузить в " + S.Default() + "?";
+                d.Filter = "Картинки|" + string.Join(";", Actions.ImageFilter) + "|Все файлы|*.*";
+                d.Multiselect = true;
+                if (d.ShowDialog() != DialogResult.OK) return;
+                await Actions.UploadFiles(S, d.FileNames, S.Default());
+            }
+        }
+
+        async void UploadFromClipboard()
+        {
+            try
+            {
+                if (Clipboard.ContainsFileDropList())
+                {
+                    var files = Clipboard.GetFileDropList().Cast<string>().Where(File.Exists).ToList();
+                    if (files.Count > 0) { await Actions.UploadFiles(S, files, S.Default()); return; }
+                }
+                if (Clipboard.ContainsImage())
+                {
+                    using (var img = Clipboard.GetImage())
+                    using (var bmp = new Bitmap(img))
+                        await Actions.Upload(S, Imaging.Png(bmp), Imaging.ShotName(".png"), S.Default(), bmp, true);
+                    return;
+                }
+                Toast.Info(null, "В буфере нет картинки", "Скопируй картинку или файл и попробуй ещё раз.", null);
+            }
+            catch (Exception ex)
+            {
+                Toast.Info(null, "Не удалось прочитать буфер", ex.Message, null, 8);
+            }
+        }
+
+        void ShowSettings()
+        {
+            if (settingsForm != null) { settingsForm.Activate(); return; }
+            settingsForm = new SettingsForm(S);
+            settingsForm.FormClosed += (s, e) =>
+            {
+                settingsForm = null;
+                ApplyHook();
+            };
+            settingsForm.Show();
+            Native.ForceForeground(settingsForm.Handle);
+        }
+
+        void ShowHistory()
+        {
+            if (historyForm != null) { historyForm.Activate(); return; }
+            historyForm = new HistoryForm(S);
+            historyForm.FormClosed += (s, e) => historyForm = null;
+            historyForm.Show();
+            Native.ForceForeground(historyForm.Handle);
+        }
+
+        void Quit()
+        {
+            hook.Stop();
+            tray.Visible = false;
+            tray.Dispose();
+            S.Save();
+            ExitThread();
+        }
+    }
+
+    /// <summary>Runs when files are passed on the command line ("Send to" menu): uploads them, then exits.</summary>
+    class FileUploadContext : ApplicationContext
+    {
+        public FileUploadContext(string[] files)
+        {
+            var s = Settings.Load();
+            var ui = new Control();
+            var h = ui.Handle;
+            bool finished = false;
+            Toast.AllClosed += () => { if (finished) ExitThread(); };
+            ui.BeginInvoke((Action)(async () =>
+            {
+                await Actions.UploadFiles(s, files, s.Default());
+                finished = true;
+                if (Toast.OpenCount == 0) ExitThread();
+            }));
+        }
+    }
+}
