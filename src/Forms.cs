@@ -123,6 +123,7 @@ namespace Kadr
         readonly ComboBox dest;
         readonly TextBox imgurId, folder;
         readonly CheckBox copyLink, openBrowser, askName, hookKey, autostart, sendTo;
+        readonly HotkeyBox hotkey;
         readonly ListBox list;
 
         public SettingsForm(Settings s)
@@ -171,13 +172,16 @@ namespace Kadr
 
             // General
             var gen = Lay.Table(1);
-            hookKey = Lay.Check("Делать снимок по клавише PrtScn (Shift+PrtScn — весь экран)", s.HookPrintScreen);
+            hookKey = Lay.Check("Снимок по сочетанию клавиш:", s.HookPrintScreen);
+            hotkey = new HotkeyBox(s.Hotkey);
+            hookKey.CheckedChanged += (o, e) => hotkey.Enabled = hookKey.Checked;
+            hotkey.Enabled = hookKey.Checked;
             autostart = Lay.Check("Запускать Кадр вместе с Windows", Shell.Autostart);
             sendTo = Lay.Check("Пункт «Кадр (загрузить)» в меню «Отправить» для картинок", Shell.SendTo);
-            Lay.Row(gen, hookKey);
+            Lay.Row(gen, Lay.Flow(hookKey, hotkey));
+            Lay.Row(gen, Lay.Hint("Щёлкни в поле и нажми нужное сочетание, например Shift+PageUp. Пока открыто это окно, сочетание не срабатывает.", 440));
             Lay.Row(gen, autostart);
             Lay.Row(gen, sendTo);
-            Lay.Row(gen, Lay.Hint("Если по PrtScn открывается «Ножницы» Windows: Параметры → Специальные возможности → Клавиатура → выключи «Использовать PrtScn для открытия захвата экрана».", 440));
             root.Controls.Add(Lay.Group("Общее", gen));
 
             var ok = Lay.Button("Сохранить", (o, e) => SaveAndClose());
@@ -299,6 +303,13 @@ namespace Kadr
 
         void SaveAndClose()
         {
+            if (hookKey.Checked && !Settings.HotkeyAllowed(hotkey.Value))
+            {
+                MessageBox.Show(this, "Сочетание «" + Settings.KeyText(hotkey.Value) + "» мешало бы печатать. Добавь Ctrl, Alt или Shift (например Shift+PageUp) или возьми F1–F12, PrtScn, Pause, Insert, PageUp.", "Кадр", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                hotkey.Focus();
+                return;
+            }
+            S.Hotkey = hotkey.Value;
             S.ImgurClientId = imgurId.Text.Trim();
             S.CopyLink = copyLink.Checked;
             S.OpenInBrowser = openBrowser.Checked;
@@ -313,6 +324,45 @@ namespace Kadr
             try { if (Shell.SendTo != sendTo.Checked) Shell.SendTo = sendTo.Checked; }
             catch (Exception ex) { MessageBox.Show(this, "Не удалось изменить меню «Отправить»: " + ex.Message, "Кадр"); }
             Close();
+        }
+    }
+
+    /// <summary>A box that records the key combination pressed in it.</summary>
+    class HotkeyBox : TextBox
+    {
+        public int Value;
+
+        public HotkeyBox(int value)
+        {
+            Value = value;
+            ReadOnly = true;
+            BackColor = SystemColors.Window;
+            ShortcutsEnabled = false;
+            Width = UI.S(170);
+            Margin = new Padding(UI.S(4), UI.S(2), 0, UI.S(2));
+            Text = Settings.KeyText(value);
+        }
+
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            Keys code = keyData & Keys.KeyCode;
+            if (code == Keys.Tab && (keyData & (Keys.Control | Keys.Alt)) == 0) return base.ProcessCmdKey(ref msg, keyData);
+            if (code == Keys.ShiftKey || code == Keys.ControlKey || code == Keys.Menu || code == Keys.LWin || code == Keys.RWin) return true;
+            Set(keyData);
+            return true;
+        }
+
+        protected override void OnKeyUp(KeyEventArgs e)
+        {
+            base.OnKeyUp(e);
+            if (e.KeyCode == Keys.PrintScreen) Set(e.KeyData);
+        }
+
+        void Set(Keys keyData)
+        {
+            Value = (int)(keyData & (Keys.KeyCode | Keys.Shift | Keys.Control | Keys.Alt));
+            Text = Settings.KeyText(Value);
+            SelectionStart = Text.Length;
         }
     }
 

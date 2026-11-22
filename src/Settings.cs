@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Web.Script.Serialization;
+using Keys = System.Windows.Forms.Keys;
 
 namespace Kadr
 {
@@ -73,7 +74,10 @@ namespace Kadr
         public bool OpenInBrowser { get; set; }
         public bool AskFileName { get; set; }
         public string SaveFolder { get; set; }
+        /// <summary>Whether the capture hotkey is on (name kept from the PrtScn-only version).</summary>
         public bool HookPrintScreen { get; set; }
+        /// <summary>System.Windows.Forms.Keys value: key code plus Shift/Control/Alt bits.</summary>
+        public int Hotkey { get; set; }
         public int PenColor { get; set; }
         public int PenSize { get; set; }
         public List<CustomUploader> Uploaders { get; set; }
@@ -85,6 +89,7 @@ namespace Kadr
             CopyLink = true;
             AskFileName = true;
             HookPrintScreen = true;
+            Hotkey = (int)(Keys.Shift | Keys.PageUp);
             SaveFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "Кадр");
             PenColor = Color.FromArgb(229, 57, 53).ToArgb();
             PenSize = 4;
@@ -115,6 +120,7 @@ namespace Kadr
                     foreach (var u in s.Uploaders) u.Normalize();
                     if (s.PenSize < 1 || s.PenSize > 20) s.PenSize = 4;
                     if (string.IsNullOrEmpty(s.SaveFolder)) s.SaveFolder = new Settings().SaveFolder;
+                    if (!HotkeyAllowed(s.Hotkey)) s.Hotkey = new Settings().Hotkey;
                     return s;
                 }
             }
@@ -126,6 +132,40 @@ namespace Kadr
         public void Save()
         {
             try { File.WriteAllText(FilePath, Json.Ser.Serialize(this), Encoding.UTF8); } catch { }
+        }
+
+        public static string KeyText(int hotkey)
+        {
+            var k = (Keys)hotkey;
+            var code = k & Keys.KeyCode;
+            var parts = new List<string>();
+            if ((k & Keys.Control) != 0) parts.Add("Ctrl");
+            if ((k & Keys.Alt) != 0) parts.Add("Alt");
+            if ((k & Keys.Shift) != 0) parts.Add("Shift");
+            string n;
+            if (code == Keys.PageUp) n = "PageUp";
+            else if (code == Keys.PageDown) n = "PageDown";
+            else if (code == Keys.PrintScreen) n = "PrtScn";
+            else if (code == Keys.Scroll) n = "ScrollLock";
+            else if (code == Keys.Return) n = "Enter";
+            else if (code >= Keys.D0 && code <= Keys.D9) n = ((char)('0' + (code - Keys.D0))).ToString();
+            else if (code >= Keys.NumPad0 && code <= Keys.NumPad9) n = "Num " + (int)(code - Keys.NumPad0);
+            else if (code >= Keys.A && code <= Keys.Z) n = ((char)code).ToString();
+            else n = code.ToString();
+            parts.Add(n);
+            return string.Join("+", parts);
+        }
+
+        /// <summary>Keys that type text must come with Ctrl, Alt or Shift, or typing would take screenshots.</summary>
+        public static bool HotkeyAllowed(int hotkey)
+        {
+            var k = (Keys)hotkey;
+            var code = k & Keys.KeyCode;
+            if (code == Keys.None || code == Keys.ShiftKey || code == Keys.ControlKey || code == Keys.Menu) return false;
+            if ((k & (Keys.Control | Keys.Alt | Keys.Shift)) != 0) return true;
+            return (code >= Keys.F1 && code <= Keys.F24)
+                || code == Keys.PrintScreen || code == Keys.Pause || code == Keys.Scroll
+                || code == Keys.Insert || code == Keys.PageUp || code == Keys.PageDown;
         }
 
         public List<string> Destinations()

@@ -10,10 +10,12 @@ using System.Windows.Forms;
 
 namespace Kadr
 {
-    /// <summary>Watches PrtScn on its own thread so a busy UI never delays the keyboard.</summary>
+    /// <summary>Watches the capture hotkey on its own thread so a busy UI never delays the keyboard.</summary>
     class KeyboardHook
     {
-        public event Action<bool> PrintScreen;
+        /// <summary>Fires with true for "whole screen" (only Shift+PrtScn when the hotkey is plain PrtScn).</summary>
+        public event Action<bool> Pressed;
+        public volatile int Hotkey = (int)(Keys.Shift | Keys.PageUp);
         Thread thread;
         uint threadId;
         IntPtr hook;
@@ -56,27 +58,37 @@ namespace Kadr
             if (nCode >= 0)
             {
                 int vk = System.Runtime.InteropServices.Marshal.ReadInt32(lParam);
-                if (vk == 0x2C)
+                int hk = Hotkey;
+                int key = hk & 0xFFFF;
+                if (vk == key)
                 {
+                    int m = wParam.ToInt32();
+                    bool isDown = m == Native.WM_KEYDOWN || m == Native.WM_SYSKEYDOWN;
+                    if (!isDown && downSeen) { downSeen = false; return (IntPtr)1; }
+
                     int flags = System.Runtime.InteropServices.Marshal.ReadInt32(lParam, 8);
                     bool alt = (flags & 0x20) != 0;
                     bool ctrl = (Native.GetAsyncKeyState(0x11) & 0x8000) != 0;
+                    bool shift = (Native.GetAsyncKeyState(0x10) & 0x8000) != 0;
                     bool win = (Native.GetAsyncKeyState(0x5B) & 0x8000) != 0 || (Native.GetAsyncKeyState(0x5C) & 0x8000) != 0;
-                    if (!alt && !ctrl && !win)
+                    bool wantCtrl = (hk & (int)Keys.Control) != 0;
+                    bool wantAlt = (hk & (int)Keys.Alt) != 0;
+                    bool wantShift = (hk & (int)Keys.Shift) != 0;
+
+                    bool match = !win && alt == wantAlt && ctrl == wantCtrl && shift == wantShift;
+                    bool full = false;
+                    bool plainPrtScn = key == 0x2C && !wantCtrl && !wantAlt && !wantShift;
+                    if (!match && plainPrtScn && shift && !alt && !ctrl && !win) { match = true; full = true; }
+
+                    if (match)
                     {
-                        bool shift = (Native.GetAsyncKeyState(0x10) & 0x8000) != 0;
-                        int m = wParam.ToInt32();
-                        bool isDown = m == Native.WM_KEYDOWN || m == Native.WM_SYSKEYDOWN;
                         if (isDown)
                         {
-                            if (!downSeen) { downSeen = true; Fire(shift); }
+                            if (!downSeen) { downSeen = true; Fire(full); }
+                            return (IntPtr)1;
                         }
-                        else
-                        {
-                            if (!downSeen) Fire(shift);
-                            downSeen = false;
-                        }
-                        return (IntPtr)1;
+                        // Some keyboards send PrtScn as a key-up only.
+                        if (key == 0x2C) { Fire(full); return (IntPtr)1; }
                     }
                 }
             }
@@ -85,7 +97,7 @@ namespace Kadr
 
         void Fire(bool shift)
         {
-            var h = PrintScreen;
+            var h = Pressed;
             if (h != null) h(shift);
         }
     }
@@ -205,7 +217,7 @@ namespace Kadr
         CaptureForm capture;
         SettingsForm settingsForm;
         HistoryForm historyForm;
-        readonly ToolStripMenuItem destMenu;
+        readonly ToolStripMenuItem destMenu, shotItem, fullItem;
 
         public TrayApp(EventWaitHandle captureSignal, bool quiet)
         {
@@ -214,10 +226,11 @@ namespace Kadr
             var h = ui.Handle;
 
             var menu = new ContextMenuStrip { Font = new Font("Segoe UI", 9.5f) };
-            var shotItem = new ToolStripMenuItem("Сделать снимок", null, (s, e) => StartCapture(false)) { ShortcutKeyDisplayString = "PrtScn" };
+            shotItem = new ToolStripMenuItem("Сделать снимок", null, (s, e) => StartCapture(false));
             shotItem.Font = new Font(menu.Font, FontStyle.Bold);
             menu.Items.Add(shotItem);
-            menu.Items.Add(new ToolStripMenuItem("Снимок экрана целиком", null, (s, e) => StartCapture(true)) { ShortcutKeyDisplayString = "Shift+PrtScn" });
+            fullItem = new ToolStripMenuItem("Снимок экрана целиком", null, (s, e) => StartCapture(true));
+            menu.Items.Add(fullItem);
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add(new ToolStripMenuItem("Загрузить картинку с компьютера…", null, (s, e) => UploadFromDisk()));
             menu.Items.Add(new ToolStripMenuItem("Загрузить картинку из буфера", null, (s, e) => UploadFromClipboard()));
@@ -233,13 +246,13 @@ namespace Kadr
             tray = new NotifyIcon
             {
                 Icon = AppIcon.Get(SystemInformation.SmallIconSize.Width),
-                Text = "Кадр — снимок экрана по PrtScn",
+                Text = "Кадр",
                 ContextMenuStrip = menu,
                 Visible = true
             };
             tray.MouseUp += (s, e) => { if (e.Button == MouseButtons.Left) StartCapture(false); };
 
-            hook.PrintScreen += shift => ui.BeginInvoke((Action)(() => StartCapture(shift)));
+            hook.Pressed += full => ui.BeginInvoke((Action)(() => StartCapture(full)));
             ApplyHook();
 
             var listener = new Thread(() =>
@@ -255,15 +268,21 @@ namespace Kadr
             if (Settings.FirstRun)
             {
                 S.Save();
-                Toast.Info(null, "Кадр запущен", "Нажми PrtScn, чтобы сделать снимок. Настройки — в значке у часов.", null, 10);
+                Toast.Info(null, "Кадр запущен", "Нажми " + Settings.KeyText(S.Hotkey) + ", чтобы сделать снимок. Настройки — в значке у часов.", null, 10);
             }
             else if (!quiet)
-                Toast.Info(null, "Кадр работает", "PrtScn — снимок области, Shift+PrtScn — весь экран.", null, 5);
+                Toast.Info(null, "Кадр работает", S.HookPrintScreen ? Settings.KeyText(S.Hotkey) + " — снимок экрана." : "Снимок — щелчок по значку у часов.", null, 5);
         }
 
         void ApplyHook()
         {
+            hook.Hotkey = S.Hotkey;
             if (S.HookPrintScreen) hook.Start(); else hook.Stop();
+            string key = Settings.KeyText(S.Hotkey);
+            bool plainPrtScn = S.Hotkey == (int)Keys.PrintScreen;
+            shotItem.ShortcutKeyDisplayString = S.HookPrintScreen ? key : "";
+            fullItem.ShortcutKeyDisplayString = S.HookPrintScreen && plainPrtScn ? "Shift+PrtScn" : "";
+            tray.Text = S.HookPrintScreen ? "Кадр — снимок по " + key : "Кадр — щёлкни для снимка";
         }
 
         void FillDestinations()
@@ -405,6 +424,7 @@ namespace Kadr
         void ShowSettings()
         {
             if (settingsForm != null) { settingsForm.Activate(); return; }
+            hook.Stop();
             settingsForm = new SettingsForm(S);
             settingsForm.FormClosed += (s, e) =>
             {
