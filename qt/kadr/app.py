@@ -24,8 +24,32 @@ IMAGE_FILTER = "*.png *.jpg *.jpeg *.gif *.webp *.bmp"
 
 # ---------------- icons ----------------
 
+ICON_SIZES = [16, 20, 24, 32, 40, 48, 64, 128, 256, 512, 1024]
+
+
+def icon_file(size: int):
+    """The designed icon (icons/kadr-<size>.png, drawn by tools/draw_icon.py): next to the package when built,
+    in the repository's icons/ folder when run from source."""
+    best = next((s for s in ICON_SIZES if s >= size), ICON_SIZES[-1])
+    for folder in (Path(__file__).with_name("icons"), Path(__file__).resolve().parents[2] / "icons"):
+        f = folder / f"kadr-{best}.png"
+        if f.exists():
+            return f
+    return None
+
+
 def app_icon_pixmap(size: int) -> QPixmap:
-    """A rounded square in teal→blue with a white viewfinder (same as the Windows version)."""
+    f = icon_file(size)
+    if f is not None:
+        pm = QPixmap(str(f))
+        if not pm.isNull():
+            return pm if pm.width() == size else pm.scaled(size, size, Qt.AspectRatioMode.KeepAspectRatio,
+                                                         Qt.TransformationMode.SmoothTransformation)
+    return _drawn_icon(size)
+
+
+def _drawn_icon(size: int) -> QPixmap:
+    """Fallback if the icon files are missing: the plain viewfinder."""
     pm = QPixmap(size, size)
     pm.fill(Qt.GlobalColor.transparent)
     p = QPainter(pm)
@@ -72,7 +96,7 @@ def tray_icon() -> QIcon:
         icon.setIsMask(True)
         return icon
     icon = QIcon()
-    for s in (16, 22, 24, 32, 48, 64):
+    for s in (16, 20, 24, 32, 48, 64):
         icon.addPixmap(app_icon_pixmap(s))
     return icon
 
@@ -183,6 +207,8 @@ class KadrApp(QObject):
             if not self.hotkey.register(self.S.Hotkey):
                 msg = F("Сочетание {0} занято другой программой. Выбери другое в настройках.", self.key_text())
                 QTimer.singleShot(1500 if first else 0, lambda: toast.error(T("Кадр"), msg))
+        elif not self.S.HookPrintScreen:
+            self.hotkey.disable()
         else:
             self.hotkey.unregister()
         self.tray.setToolTip(F("Кадр — снимок по {0}", self.key_text()) if self.hotkey.supported() and self.S.HookPrintScreen

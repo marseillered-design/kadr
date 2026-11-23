@@ -20,7 +20,11 @@ class GlobalHotkey(QObject):
         self._impl = None
 
     def supported(self) -> bool:
-        return platform_utils.MAC or (platform_utils.LINUX and not platform_utils.is_wayland())
+        if platform_utils.MAC:
+            return True
+        if platform_utils.LINUX:
+            return not platform_utils.is_wayland() or _GnomeShortcut.available()
+        return False
 
     def register(self, sequence: str) -> bool:
         self.unregister()
@@ -34,12 +38,20 @@ class GlobalHotkey(QObject):
         try:
             if platform_utils.MAC:
                 self._impl = _MacHotkey(key, mods, self.activated.emit)
+            elif platform_utils.is_wayland():
+                self._impl = _GnomeShortcut(key, mods)
             else:
                 self._impl = _X11Hotkey(key, mods, self.activated.emit)
             return self._impl.ok
         except Exception:
             self._impl = None
             return False
+
+    def disable(self):
+        """The user switched the hotkey off: also remove it from GNOME's own shortcuts."""
+        self.unregister()
+        if platform_utils.LINUX and platform_utils.is_wayland() and _GnomeShortcut.available():
+            _GnomeShortcut.remove()
 
     def unregister(self):
         if self._impl is not None:
@@ -125,6 +137,76 @@ class _MacHotkey:
             self.carbon.UnregisterEventHotKey(self._hotkey_ref)
         if getattr(self, "_handler_ref", None):
             self.carbon.RemoveEventHandler(self._handler_ref)
+
+
+# ---------------- Linux Wayland on GNOME (Ubuntu, Fedora): a custom shortcut in the system settings ----------------
+
+_GNOME_LIST = ("org.gnome.settings-daemon.plugins.media-keys", "custom-keybindings")
+_GNOME_PATH = "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/kadr/"
+_GNOME_ITEM = "org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:" + _GNOME_PATH
+
+_GNOME_KEYS = {Qt.Key.Key_PageUp: "Page_Up", Qt.Key.Key_PageDown: "Page_Down", Qt.Key.Key_Print: "Print",
+               Qt.Key.Key_Home: "Home", Qt.Key.Key_End: "End", Qt.Key.Key_Insert: "Insert", Qt.Key.Key_Pause: "Pause",
+               Qt.Key.Key_Space: "space", Qt.Key.Key_ScrollLock: "Scroll_Lock"}
+
+
+def _gsettings(*args) -> str:
+    import subprocess
+    r = subprocess.run(["gsettings", *args], capture_output=True, text=True, timeout=5)
+    if r.returncode != 0:
+        raise RuntimeError(r.stderr.strip())
+    return r.stdout.strip()
+
+
+class _GnomeShortcut:
+    """Wayland lets no app catch keys, but GNOME runs `kadr --capture` for a shortcut stored in its settings.
+    The running Kadr gets that call and opens the capture."""
+
+    @staticmethod
+    def available() -> bool:
+        import os
+        import shutil
+        return "GNOME" in os.environ.get("XDG_CURRENT_DESKTOP", "").upper() and shutil.which("gsettings") is not None
+
+    def __init__(self, key, mods):
+        self.ok = False
+        if key in _GNOME_KEYS:
+            name = _GNOME_KEYS[key]
+        elif Qt.Key.Key_F1 <= key <= Qt.Key.Key_F24:
+            name = "F%d" % (key - Qt.Key.Key_F1 + 1)
+        elif Qt.Key.Key_A <= key <= Qt.Key.Key_Z or Qt.Key.Key_0 <= key <= Qt.Key.Key_9:
+            name = chr(key).lower()
+        else:
+            return
+        accel = ""
+        if mods & Qt.KeyboardModifier.ControlModifier: accel += "<Control>"
+        if mods & Qt.KeyboardModifier.ShiftModifier: accel += "<Shift>"
+        if mods & Qt.KeyboardModifier.AltModifier: accel += "<Alt>"
+        if mods & Qt.KeyboardModifier.MetaModifier: accel += "<Super>"
+        current = _gsettings("get", *_GNOME_LIST)
+        paths = [] if current.startswith("@as") else [p.strip().strip("'") for p in current.strip("[]").split(",") if p.strip()]
+        if _GNOME_PATH not in paths:
+            paths.append(_GNOME_PATH)
+            _gsettings("set", *_GNOME_LIST, "[" + ", ".join(f"'{p}'" for p in paths) + "]")
+        _gsettings("set", _GNOME_ITEM, "name", "Kadr")
+        _gsettings("set", _GNOME_ITEM, "command", platform_utils.executable_command() + " --capture")
+        _gsettings("set", _GNOME_ITEM, "binding", accel + name)
+        self.ok = True
+
+    @staticmethod
+    def remove():
+        try:
+            current = _gsettings("get", *_GNOME_LIST)
+            paths = [p.strip().strip("'") for p in current.strip("[]").split(",") if p.strip() and not current.startswith("@as")]
+            if _GNOME_PATH in paths:
+                paths.remove(_GNOME_PATH)
+                _gsettings("set", *_GNOME_LIST, "[" + ", ".join(f"'{p}'" for p in paths) + "]" if paths else "@as []")
+            _gsettings("reset", _GNOME_ITEM, "binding")
+        except Exception:
+            pass
+
+    def close(self):
+        pass   # the shortcut stays in GNOME while Kadr is closed; starting it again is what the shortcut does
 
 
 # ---------------- Linux X11 ----------------

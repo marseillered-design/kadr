@@ -314,7 +314,20 @@ namespace Kadr
         static byte[] cached;
         public static Icon Get(int size)
         {
-            if (cached == null) cached = Ico();
+            if (cached == null)
+            {
+                // The designed icon embedded by build.ps1; the drawn one is only a fallback.
+                using (var s = System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("Kadr.icon.ico"))
+                {
+                    if (s != null)
+                    {
+                        var ms = new MemoryStream();
+                        s.CopyTo(ms);
+                        cached = ms.ToArray();
+                    }
+                }
+                if (cached == null) cached = Ico();
+            }
             return new Icon(new MemoryStream(cached), size, size);
         }
     }

@@ -1,5 +1,5 @@
 # PyInstaller build for macOS (.app) and Linux (folder that becomes an AppImage).
-# Run from the qt/ folder after `python tools/make_icons.py`:  pyinstaller kadr.spec
+# Run from the qt/ folder:  pyinstaller kadr.spec   (icons come from ../icons, drawn by tools/draw_icon.py)
 import sys
 
 mac = sys.platform == "darwin"
@@ -14,21 +14,21 @@ else:
 a = Analysis(
     ["run_kadr.py"],
     pathex=["."],
-    datas=[("kadr/lang.json", "kadr")],
+    datas=[("kadr/lang.json", "kadr")] + [(f"../icons/kadr-{n}.png", "kadr/icons") for n in (16, 20, 24, 32, 48, 64, 128, 256, 512)],
     hiddenimports=hidden,
     excludes=["tkinter", "PySide6.QtQml", "PySide6.QtQuick", "PySide6.QtWebEngineCore", "PySide6.QtMultimedia",
               "PySide6.Qt3DCore", "PySide6.QtCharts", "PySide6.QtPdf", "PySide6.QtSql", "PySide6.QtTest"],
 )
 pyz = PYZ(a.pure)
 exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name="Kadr" if mac else "kadr", console=False,
-          icon="build/icon.png", argv_emulation=False)
+          icon="../icons/kadr-mac-1024.png" if mac else "../icons/kadr-256.png", argv_emulation=False)
 coll = COLLECT(exe, a.binaries, a.datas, name="Kadr" if mac else "kadr")
 
 if mac:
     app = BUNDLE(
         coll,
         name="Kadr.app",
-        icon="build/icon.png",
+        icon="../icons/kadr-mac-1024.png",
         bundle_identifier="app.kadr",
         info_plist={
             "CFBundleName": "Kadr",
