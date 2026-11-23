@@ -1,2 +1,11 @@
 Kadr.exe
 *.pdb
+qt/.venv/
+qt/build/
+qt/dist/
+qt/AppDir/
+qt/selftest*/
+qt/*.AppImage
+qt/*.dmg
+__pycache__/
+*.pyc
