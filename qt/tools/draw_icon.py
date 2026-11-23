@@ -42,7 +42,7 @@ def aperture(p: QPainter, center: QPointF, R: float, size_px: int, ink: QColor, 
     hole=None punches the opening and the edges out (for one-colour menu-bar icons)."""
     import math
     small = size_px <= 24
-    r_in = R * (0.45 if small else 0.42)
+    r_in = R * (0.36 if small else 0.42)
     hexa = [QPointF(center.x() + r_in * math.cos(math.radians(i * 60 - 90)),
                     center.y() + r_in * math.sin(math.radians(i * 60 - 90))) for i in range(6)]
     disc = QPainterPath()
@@ -51,8 +51,9 @@ def aperture(p: QPainter, center: QPointF, R: float, size_px: int, ink: QColor, 
     opening.addPolygon(QPolygonF(hexa))
     opening.closeSubpath()
     shape = disc.subtracted(opening)
-    if not small:
-        width = size_px * 0.045
+    if True:
+        # small sizes: wider gaps (at least ~1.3 px) so the blades stay visible in the tray
+        width = max(1.3, size_px * 0.085) if small else size_px * 0.045
         for i, v in enumerate(hexa):
             a = math.radians(i * 60 - 90 + 120)       # each blade edge runs out tangentially to the rim
             end = QPointF(v.x() + math.cos(a) * R * 1.3, v.y() + math.sin(a) * R * 1.3)
@@ -72,7 +73,8 @@ def aperture(p: QPainter, center: QPointF, R: float, size_px: int, ink: QColor, 
 
 def _glyph(p: QPainter, r: QRectF, small: bool):
     S = r.width()
-    aperture(p, r.center(), S * 0.30, int(S), QColor(Qt.GlobalColor.white), HOLE)
+    # small icons: a bigger disc so the blades have room
+    aperture(p, r.center(), S * (0.37 if small else 0.30), int(S), QColor(Qt.GlobalColor.white), HOLE)
 
 
 def draw(size: int, mac: bool = False) -> QImage:
