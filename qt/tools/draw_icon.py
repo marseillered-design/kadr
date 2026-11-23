@@ -15,69 +15,64 @@ ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "icons"
 SIZES = [16, 20, 24, 32, 40, 48, 64, 128, 256, 512, 1024]
 
-SKY = QColor("#12B5CB")
-INDIGO = QColor("#3D5AFE")
-DEEP = QColor("#2A2FB8")
-AMBER = QColor("#FFB300")
+CORAL = QColor("#FF6A5B")
+ROSE = QColor("#F0425F")
+BERRY = QColor("#D6246E")
+HOLE = QColor("#E0335F")
 
 
 def _body(p: QPainter, r: QRectF, radius: float):
     path = QPainterPath()
     path.addRoundedRect(r, radius, radius)
     g = QLinearGradient(r.topLeft(), r.bottomRight())
-    g.setColorAt(0.0, SKY)
-    g.setColorAt(0.55, INDIGO)
-    g.setColorAt(1.0, DEEP)
+    g.setColorAt(0.0, CORAL)
+    g.setColorAt(0.55, ROSE)
+    g.setColorAt(1.0, BERRY)
     p.fillPath(path, g)
     # soft light from the top-left, keeps it from looking flat at large sizes
-    hl = QRadialGradient(QPointF(r.left() + r.width() * 0.25, r.top() + r.height() * 0.15), r.width() * 0.75)
-    hl.setColorAt(0, QColor(255, 255, 255, 60))
+    hl = QRadialGradient(QPointF(r.left() + r.width() * 0.28, r.top() + r.height() * 0.18), r.width() * 0.8)
+    hl.setColorAt(0, QColor(255, 255, 255, 55))
     hl.setColorAt(1, QColor(255, 255, 255, 0))
     p.fillPath(path, hl)
     return path
 
 
-def _glyph(p: QPainter, r: QRectF, small: bool):
-    """White viewfinder corners, the captured area inside, and (big sizes) an amber pointer selecting it."""
-    S = r.width()
-    x0, y0 = r.left(), r.top()
-    P = lambda fx, fy: QPointF(x0 + fx * S, y0 + fy * S)
-    w = S * (0.10 if small else 0.072)
-    a, b = (0.20, 0.80) if small else (0.21, 0.79)
-    L = 0.21 if small else 0.18
-    pen = QPen(QColor(Qt.GlobalColor.white), w, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin)
-    p.setPen(pen)
-    p.setBrush(Qt.BrushStyle.NoBrush)
-    corners = [[P(a, a + L), P(a, a), P(a + L, a)], [P(b - L, a), P(b, a), P(b, a + L)],
-               [P(a + L, b), P(a, b), P(a, b - L)]]
-    if small:   # at big sizes the pointer takes the place of the bottom-right corner
-        corners.append([P(b, b - L), P(b, b), P(b - L, b)])
-    for pts in corners:
-        p.drawPolyline(pts)
-    if small:
-        d = S * 0.2
-        p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QColor(Qt.GlobalColor.white))
-        p.drawEllipse(P(0.5, 0.5), d / 2, d / 2)
-        return
-    # the captured area
-    area = QPainterPath()
-    area.addRoundedRect(QRectF(P(0.33, 0.33), P(0.67, 0.67)), S * 0.035, S * 0.035)
-    p.fillPath(area, QColor(255, 255, 255, 70))
-    p.setPen(QPen(QColor(255, 255, 255, 200), S * 0.012, Qt.PenStyle.DashLine))
-    p.drawPath(area)
-    # pointer, tip on the area's bottom-right corner
-    tip = P(0.63, 0.61)
-    s = S * 0.31
-    shape = [(0, 0), (0, 0.78), (0.20, 0.60), (0.33, 0.92), (0.46, 0.86), (0.33, 0.56), (0.60, 0.56)]
-    poly = QPolygonF([QPointF(tip.x() + dx * s, tip.y() + dy * s) for dx, dy in shape])
-    shadow = QPolygonF([pt + QPointF(S * 0.012, S * 0.02) for pt in poly])
+def aperture(p: QPainter, center: QPointF, R: float, size_px: int, ink: QColor, hole: QColor | None):
+    """Camera shutter blades: a disc with a hexagonal opening and six blade edges.
+    hole=None punches the opening and the edges out (for one-colour menu-bar icons)."""
+    import math
+    small = size_px <= 24
+    r_in = R * (0.45 if small else 0.42)
+    hexa = [QPointF(center.x() + r_in * math.cos(math.radians(i * 60 - 90)),
+                    center.y() + r_in * math.sin(math.radians(i * 60 - 90))) for i in range(6)]
+    disc = QPainterPath()
+    disc.addEllipse(center, R, R)
+    opening = QPainterPath()
+    opening.addPolygon(QPolygonF(hexa))
+    opening.closeSubpath()
+    shape = disc.subtracted(opening)
+    if not small:
+        width = size_px * 0.045
+        for i, v in enumerate(hexa):
+            a = math.radians(i * 60 - 90 + 120)       # each blade edge runs out tangentially to the rim
+            end = QPointF(v.x() + math.cos(a) * R * 1.3, v.y() + math.sin(a) * R * 1.3)
+            line = QPainterPath(v)
+            line.lineTo(end)
+            stroker = __import__("PySide6.QtGui", fromlist=["QPainterPathStroker"]).QPainterPathStroker()
+            stroker.setWidth(width)
+            stroker.setCapStyle(Qt.PenCapStyle.FlatCap)
+            shape = shape.subtracted(stroker.createStroke(line))
     p.setPen(Qt.PenStyle.NoPen)
-    p.setBrush(QColor(0, 0, 40, 70))
-    p.drawPolygon(shadow)
-    p.setBrush(AMBER)
-    p.setPen(QPen(QColor(Qt.GlobalColor.white), S * 0.022, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
-    p.drawPolygon(poly)
+    p.fillPath(shape, ink)
+    if hole is not None:
+        # fill the cut-outs with the background colour so they read as blades, not holes
+        rest = disc.subtracted(shape)
+        p.fillPath(rest, hole)
+
+
+def _glyph(p: QPainter, r: QRectF, small: bool):
+    S = r.width()
+    aperture(p, r.center(), S * 0.30, int(S), QColor(Qt.GlobalColor.white), HOLE)
 
 
 def draw(size: int, mac: bool = False) -> QImage:

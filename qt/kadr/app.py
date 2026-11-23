@@ -81,6 +81,31 @@ def _viewfinder(p, size, color):
     p.drawEllipse(QPointF(size / 2, size / 2), d / 2, d / 2)
 
 
+def _aperture_mask(p, size):
+    """The app icon's shutter blades in black on transparent: macOS recolours it for the menu bar."""
+    import math
+    from PySide6.QtGui import QPainterPathStroker, QPolygonF
+    c = QPointF(size / 2, size / 2)
+    R = size * 0.42
+    r_in = R * 0.42
+    hexa = [QPointF(c.x() + r_in * math.cos(math.radians(i * 60 - 90)), c.y() + r_in * math.sin(math.radians(i * 60 - 90)))
+            for i in range(6)]
+    disc = QPainterPath()
+    disc.addEllipse(c, R, R)
+    hole = QPainterPath()
+    hole.addPolygon(QPolygonF(hexa))
+    hole.closeSubpath()
+    shape = disc.subtracted(hole)
+    st = QPainterPathStroker()
+    st.setWidth(max(1.0, size * 0.07))
+    for i, v in enumerate(hexa):
+        a = math.radians(i * 60 + 30)
+        line = QPainterPath(v)
+        line.lineTo(QPointF(v.x() + math.cos(a) * R * 1.3, v.y() + math.sin(a) * R * 1.3))
+        shape = shape.subtracted(st.createStroke(line))
+    p.fillPath(shape, QColor(Qt.GlobalColor.black))
+
+
 def tray_icon() -> QIcon:
     if platform_utils.MAC:
         # Menu-bar icons are black "template" images that macOS recolours for light/dark menus.
@@ -90,7 +115,7 @@ def tray_icon() -> QIcon:
             pm.fill(Qt.GlobalColor.transparent)
             p = QPainter(pm)
             p.setRenderHint(QPainter.RenderHint.Antialiasing)
-            _viewfinder(p, s, QColor(Qt.GlobalColor.black))
+            _aperture_mask(p, s)
             p.end()
             icon.addPixmap(pm)
         icon.setIsMask(True)
