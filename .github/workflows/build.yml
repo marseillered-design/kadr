@@ -146,10 +146,13 @@ jobs:
     runs-on: ubuntu-latest
     permissions: { contents: write }
     steps:
+      - uses: actions/checkout@v4
+        with: { sparse-checkout: RELEASE_NOTES.md, sparse-checkout-cone-mode: false, path: src }
       - uses: actions/download-artifact@v4
         with: { pattern: "Kadr-*", merge-multiple: true }
       - uses: softprops/action-gh-release@v2
         with:
+          body_path: src/RELEASE_NOTES.md
           files: |
             Kadr-Setup-Windows.exe
             Kadr-macOS-*.dmg

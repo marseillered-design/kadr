@@ -1,38 +1,57 @@
-# Кадр
+# Kadr
 
-Версия для macOS и Linux — в папке [qt](qt/README.md).
+[Русская версия](README.ru.md)
 
-Снимки экрана для Windows в духе Lightshot, но загружать можно куда хочешь: в Catbox, Imgur или любой свой сервис.
+A screenshot tool for Windows, macOS and Linux in the spirit of Lightshot — but you choose where your screenshots go: Catbox, Imgur or any upload service of your own.
 
-## Как пользоваться
+## Download
 
-- **Shift+PageUp** — выделить область (сочетание меняется в настройках). Окно под курсором подсвечивается: щелчок берёт его ровно по краям, щелчок по рабочему столу — весь экран. Лупа у курсора показывает пиксели, координаты и цвет.
-- Инструменты справа: карандаш (P), линия (L), стрелка (A), прямоугольник (R), овал (E), маркер (M), текст (T), шаги 1-2-3 (N), пиксели (B) и размытие (U) — скрыть данные, цвет, отмена (Ctrl+Z). Колёсико мыши меняет толщину и размер текста. Shift — ровные линии и квадраты.
-- Внизу: **загрузить** (Ctrl+D), стрелка рядом — выбрать, куда загрузить; **копировать** (Ctrl+C или Enter); **сохранить** (Ctrl+S); **печать** (Ctrl+P); **закрыть** (Esc).
-- Выделение двигается мышью и стрелками (Shift+стрелки меняют размер), его углы тянутся.
-- После загрузки ссылка уже в буфере, а внизу справа появляется уведомление: щелчок открывает ссылку.
-- Значок у часов: снимок, загрузка картинки с диска или из буфера, «Куда загружать», история загрузок (с удалением с Imgur), настройки.
-- Сохранение (Ctrl+S) показывает уведомление: щелчок открывает картинку, кнопка с папкой показывает её в Проводнике.
-- Язык: русский, українська, English, Deutsch, Français, Español, Italiano — Настройки → «Общее» → «Язык». Сначала берётся язык Windows.
-- Формат снимков для сохранения и загрузки: PNG или JPG с выбором качества (Настройки → «Сохранение»).
-- Прокси для загрузки: как в Windows, без прокси или свой адрес с логином и паролем (пароль хранится зашифрованным для этого пользователя Windows).
-- Уведомления об успехе можно выключить; ошибки показываются всегда.
-- В настройках можно включить пункт «Кадр (загрузить)» в меню «Отправить»: правой кнопкой по фото → Отправить → Кадр.
+Get the installer for your system from **Releases**:
 
-## Catbox
+| System | File |
+|---|---|
+| Windows 10/11 | `Kadr-Setup-Windows.exe` (or `Kadr.exe`, no installation needed) |
+| macOS on Apple Silicon (M1–M4) | `Kadr-macOS-AppleSilicon.dmg` |
+| macOS on Intel | `Kadr-macOS-Intel.dmg` |
+| Ubuntu, Debian, Mint | `Kadr-Linux-amd64.deb` |
+| Fedora, openSUSE | `Kadr-Linux-x86_64.rpm` |
+| Any Linux, no installation | `Kadr-Linux-x86_64.AppImage` |
 
-Работает сразу: без регистрации и ключей, ссылки вида files.catbox.moe/abc123.png не удаляются. Выбран по умолчанию.
+**Windows** — run the installer; it needs no administrator password. Kadr is not signed with a paid certificate, so Windows may show “Windows protected your PC” the first time: click **More info → Run anyway**.
 
-## Imgur
+**macOS** — open the .dmg and drag **Kadr** onto **Applications**. If macOS won’t open it the first time: **System Settings → Privacy & Security → Open Anyway**. On the first screenshot macOS asks for **Screen Recording** access: turn Kadr on and restart it. Kadr lives in the menu bar.
 
-Нужен бесплатный Client ID: Настройки → «Где его взять?» — там пошагово.
+**Linux** — double-click the .deb or .rpm and choose **Install**; Kadr appears in your app menu. On GNOME the tray icon needs the AppIndicator extension (Ubuntu has it already).
 
-## Свой сервис
+## How to use
 
-Настройки → «Свои сервисы» → «Добавить…»: адрес, поле с файлом и где в ответе ссылка (`{json:data.url}`, `{response}`, `{regex:...}`). Готовые файлы ShareX `.sxcu` импортируются как есть.
+- **Shift+PageUp** selects an area (**⌘⇧2** on a Mac). You can choose any key combination you like in Settings. The window under the cursor is highlighted: a click takes exactly that window, a click on the desktop takes the whole screen. A magnifier next to the cursor shows the pixels, coordinates and colour.
+- Tools on the right: pen (P), line (L), arrow (A), rectangle (R), ellipse (E), highlighter (M), text (T), numbered steps 1-2-3 (N), pixelate (B) and blur (U) to hide private data, colour, undo (Ctrl+Z). The mouse wheel changes the thickness and text size. Hold Shift for straight lines and squares.
+- Below the selection: **upload** (Ctrl+D) — the arrow next to it lets you pick where to upload; **copy** (Ctrl+C or Enter); **save** (Ctrl+S); **print** (Ctrl+P); **close** (Esc).
+- Move the selection with the mouse or the arrow keys (Shift+arrows resize it); drag its corners and edges.
+- After an upload the link is already on your clipboard, and a notice appears in the corner: click it to open the link, or use the copy button.
+- Saving (Ctrl+S) shows a notice too: click it to open the picture, or use the folder button to show it in Explorer / Finder.
+- The tray / menu-bar icon: take a screenshot, upload a picture from disk or from the clipboard, choose where to upload, upload history (with deletion from Imgur), settings.
+- Languages: Русский, Українська, English, Deutsch, Français, Español, Italiano — Settings → General → Language. Kadr starts in your system’s language.
+- Screenshot format for saving and uploading: PNG, or JPG with a quality setting.
+- Upload proxy: as in the system, none, or your own address with login and password (the password is stored encrypted).
+- Success notices can be turned off; errors are always shown.
+- Windows: Kadr can add “Kadr (upload)” to the **Send to** menu — right-click a picture → Send to → Kadr.
 
-## Сборка
+## Where uploads go
 
-`powershell -ExecutionPolicy Bypass -File build.ps1` — собирает `Kadr.exe` встроенным в Windows компилятором C# (.NET Framework 4.8), ставить ничего не нужно.
+**Catbox** — works right away: no account, no keys, links like `files.catbox.moe/abc123.png` don’t expire. This is the default.
 
-Настройки и история лежат в `%APPDATA%\Kadr`.
+**Imgur** — needs a free Client ID: Settings → “Where do I get it?” explains it step by step.
+
+**Your own service** — Settings → Your own upload services → Add…: the address, the file field, and where the link is in the reply (`{json:data.url}`, `{response}`, `{regex:...}`). Ready-made ShareX `.sxcu` files can be imported as they are.
+
+## Building
+
+Everything is built on GitHub by `.github/workflows/build.yml`; a `vX.Y.Z` tag publishes the installers on Releases.
+
+- **Windows:** `powershell -ExecutionPolicy Bypass -File build.ps1` builds `Kadr.exe` with the C# compiler that ships with Windows (.NET Framework 4.8) — nothing to install. The installer is `installer/windows/kadr.iss` (Inno Setup).
+- **macOS and Linux:** the Qt version in [qt](qt/README.md).
+- **Icon:** `qt/tools/draw_icon.py` draws every size into `icons/`.
+
+Settings and history: Windows `%APPDATA%\Kadr`, macOS `~/Library/Application Support/Kadr`, Linux `~/.config/kadr`.
