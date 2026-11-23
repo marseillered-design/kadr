@@ -107,14 +107,14 @@ namespace Kadr
     {
         public static async Task<UploadResult> Upload(Settings s, byte[] data, string fileName, string dest, Image thumbSource, bool isScreenshot)
         {
-            var toast = Toast.Show(thumbSource, L.F("Загружаю в {0}…", dest), fileName);
+            var toast = s.ShowNotifications ? Toast.Show(thumbSource, L.F("Загружаю в {0}…", dest), fileName) : null;
             try
             {
                 var r = await Uploader.Upload(s, dest, data, fileName, Imaging.ContentType(fileName));
                 if (s.CopyLink) Clip.SetText(r.Url);
                 History.Add(new HistoryItem { Time = DateTime.Now, Destination = dest, Url = r.Url, DeleteUrl = r.DeleteUrl, ImgurDeleteHash = r.ImgurDeleteHash }, thumbSource);
                 string url = r.Url;
-                toast.Done(s.CopyLink ? L.T("Ссылка скопирована") : L.F("Загружено в {0}", dest), url, () => Shell.Open(url), false, 7, url);
+                if (toast != null) toast.Done(s.CopyLink ? L.T("Ссылка скопирована") : L.F("Загружено в {0}", dest), url, () => Shell.Open(url), false, 7, url);
                 if (s.OpenInBrowser) Shell.Open(url);
                 return r;
             }
@@ -134,6 +134,7 @@ namespace Kadr
                     catch { saved = null; }
                 }
                 string savedPath = saved;
+                if (toast == null) toast = Toast.Show(thumbSource, "", fileName);
                 toast.Done(L.T("Не получилось загрузить"), msg, savedPath == null ? (Action)null : () => Shell.ShowInFolder(savedPath), true, 15);
                 return null;
             }
@@ -151,13 +152,14 @@ namespace Kadr
 
         public static void Save(Settings s, Bitmap bmp)
         {
-            string name = Imaging.ShotName(".png");
+            string name = Imaging.ShotName(s.Ext);
             string path;
             if (s.AskFileName)
             {
                 using (var d = new SaveFileDialog())
                 {
                     d.Filter = "PNG|*.png|JPEG|*.jpg";
+                    d.FilterIndex = s.Jpeg ? 2 : 1;
                     d.FileName = name;
                     try { Directory.CreateDirectory(s.SaveFolder); d.InitialDirectory = s.SaveFolder; } catch { }
                     if (d.ShowDialog() != DialogResult.OK) return;
@@ -165,21 +167,22 @@ namespace Kadr
                     string dir = Path.GetDirectoryName(path);
                     if (!string.IsNullOrEmpty(dir)) { s.SaveFolder = dir; s.Save(); }
                 }
-                Imaging.SaveFile(bmp, path);
-                Saved(bmp, path);
+                Imaging.SaveFile(bmp, path, s.JpegQuality);
+                Saved(s, bmp, path);
             }
             else
             {
                 Directory.CreateDirectory(s.SaveFolder);
                 path = Path.Combine(s.SaveFolder, name);
-                Imaging.SaveFile(bmp, path);
-                Saved(bmp, path);
+                Imaging.SaveFile(bmp, path, s.JpegQuality);
+                Saved(s, bmp, path);
             }
         }
 
         /// <summary>"Saved" notice: a click opens the picture, the folder button shows it in Explorer.</summary>
-        static void Saved(Bitmap bmp, string path)
+        static void Saved(Settings s, Bitmap bmp, string path)
         {
+            if (!s.ShowNotifications) return;
             var t = Toast.Info(bmp, L.T("Снимок сохранён"), path, () => Shell.Open(path), 8);
             t.SetButton("\uE838", () => Shell.ShowInFolder(path), false);
         }
@@ -208,7 +211,7 @@ namespace Kadr
             if (links.Count > 1 && s.CopyLink)
             {
                 Clip.SetText(string.Join(Environment.NewLine, links));
-                Toast.Info(null, L.T("Все ссылки скопированы"), L.F("{0} шт., каждая с новой строки", links.Count), null);
+                if (s.ShowNotifications) Toast.Info(null, L.T("Все ссылки скопированы"), L.F("{0} шт., каждая с новой строки", links.Count), null);
             }
         }
 
@@ -259,7 +262,7 @@ namespace Kadr
                 S.Save();
                 Toast.Info(null, L.T("Кадр запущен"), L.F("Нажми {0}, чтобы сделать снимок. Настройки — в значке у часов.", Settings.KeyText(S.Hotkey)), null, 10);
             }
-            else if (!quiet)
+            else if (!quiet && S.ShowNotifications)
                 Toast.Info(null, L.T("Кадр работает"), S.HookPrintScreen ? L.F("{0} — снимок экрана.", Settings.KeyText(S.Hotkey)) : L.T("Снимок — щелчок по значку у часов."), null, 5);
         }
 
@@ -392,8 +395,8 @@ namespace Kadr
 
         async void UploadShot(Bitmap bmp, string dest)
         {
-            byte[] png = Imaging.Png(bmp);
-            await Actions.Upload(S, png, Imaging.ShotName(".png"), dest, bmp, true);
+            byte[] data = Imaging.Encode(S, bmp);
+            await Actions.Upload(S, data, Imaging.ShotName(S.Ext), dest, bmp, true);
             bmp.Dispose();
         }
 
@@ -422,7 +425,7 @@ namespace Kadr
                 {
                     using (var img = Clipboard.GetImage())
                     using (var bmp = new Bitmap(img))
-                        await Actions.Upload(S, Imaging.Png(bmp), Imaging.ShotName(".png"), S.Default(), bmp, true);
+                        await Actions.Upload(S, Imaging.Encode(S, bmp), Imaging.ShotName(S.Ext), S.Default(), bmp, true);
                     return;
                 }
                 Toast.Info(null, L.T("В буфере нет картинки"), L.T("Скопируй картинку или файл и попробуй ещё раз."), null);

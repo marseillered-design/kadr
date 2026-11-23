@@ -32,19 +32,33 @@ namespace Kadr
             using (var ms = new MemoryStream()) { img.Save(ms, ImageFormat.Png); return ms.ToArray(); }
         }
 
-        public static void SaveFile(Image img, string path)
+        public static void SaveFile(Image img, string path, int quality)
         {
             string ext = Path.GetExtension(path).ToLowerInvariant();
-            if (ext == ".jpg" || ext == ".jpeg")
+            File.WriteAllBytes(path, Encode(img, ext == ".jpg" || ext == ".jpeg", quality));
+        }
+
+        /// <summary>The screenshot in the format chosen in Settings.</summary>
+        public static byte[] Encode(Settings s, Image img) { return Encode(img, s.Jpeg, s.JpegQuality); }
+
+        public static byte[] Encode(Image img, bool jpeg, int quality)
+        {
+            if (!jpeg) return Png(img);
+            var codec = ImageCodecInfo.GetImageEncoders().First(c => c.FormatID == ImageFormat.Jpeg.Guid);
+            // JPEG has no transparency: put see-through pixels (clipboard pictures) on white.
+            using (var flat = new Bitmap(img.Width, img.Height, PixelFormat.Format24bppRgb))
+            using (var p = new EncoderParameters(1))
+            using (var ms = new MemoryStream())
             {
-                var codec = ImageCodecInfo.GetImageEncoders().First(c => c.FormatID == ImageFormat.Jpeg.Guid);
-                using (var p = new EncoderParameters(1))
+                using (var g = Graphics.FromImage(flat))
                 {
-                    p.Param[0] = new EncoderParameter(System.Drawing.Imaging.Encoder.Quality, 92L);
-                    img.Save(path, codec, p);
+                    g.Clear(Color.White);
+                    g.DrawImage(img, new Rectangle(0, 0, img.Width, img.Height), 0, 0, img.Width, img.Height, GraphicsUnit.Pixel);
                 }
+                p.Param[0] = new EncoderParameter(System.Drawing.Imaging.Encoder.Quality, (long)Math.Max(1, Math.Min(100, quality)));
+                flat.Save(ms, codec, p);
+                return ms.ToArray();
             }
-            else img.Save(path, ImageFormat.Png);
         }
 
         public static string ContentType(string fileName)
@@ -64,6 +78,28 @@ namespace Kadr
         public static string ShotName(string ext)
         {
             return L.T("Снимок") + " " + DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss") + ext;
+        }
+    }
+
+    /// <summary>Keeps a secret readable only by this Windows user on this PC.</summary>
+    static class Secret
+    {
+        public static string Protect(string plain)
+        {
+            if (string.IsNullOrEmpty(plain)) return "";
+            var bytes = System.Security.Cryptography.ProtectedData.Protect(System.Text.Encoding.UTF8.GetBytes(plain), null, System.Security.Cryptography.DataProtectionScope.CurrentUser);
+            return Convert.ToBase64String(bytes);
+        }
+
+        public static string Unprotect(string stored)
+        {
+            if (string.IsNullOrEmpty(stored)) return "";
+            try
+            {
+                var bytes = System.Security.Cryptography.ProtectedData.Unprotect(Convert.FromBase64String(stored), null, System.Security.Cryptography.DataProtectionScope.CurrentUser);
+                return System.Text.Encoding.UTF8.GetString(bytes);
+            }
+            catch { return ""; }
         }
     }
 

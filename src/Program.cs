@@ -101,9 +101,19 @@ namespace Kadr
         static int UploadTest(string configPath, string imagePath)
         {
             var u = Json.Ser.Deserialize<CustomUploader>(File.ReadAllText(configPath));
+            string proxy = Environment.GetEnvironmentVariable("KADR_PROXY");
+            if (!string.IsNullOrEmpty(proxy))
+                Uploader.Configure(new Settings { ProxyMode = "custom", ProxyAddress = proxy, ProxyUser = "u", ProxyPassword = Secret.Protect("p") });
+            byte[] data = File.ReadAllBytes(imagePath);
+            string name = Path.GetFileName(imagePath);
+            if (Environment.GetEnvironmentVariable("KADR_JPG") == "1")
+            {
+                using (var img = Image.FromFile(imagePath)) data = Imaging.Encode(img, true, 80);
+                name = Path.ChangeExtension(name, ".jpg");
+            }
             try
             {
-                var r = Uploader.Custom(u, File.ReadAllBytes(imagePath), Path.GetFileName(imagePath), Imaging.ContentType(imagePath)).Result;
+                var r = Uploader.Custom(u, data, name, Imaging.ContentType(name)).Result;
                 Console.WriteLine("URL=" + r.Url);
                 Console.WriteLine("DEL=" + r.DeleteUrl);
                 return 0;

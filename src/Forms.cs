@@ -124,7 +124,10 @@ namespace Kadr
         readonly TextBox imgurId, folder;
         readonly CheckBox copyLink, openBrowser, askName, hookKey, autostart, sendTo;
         readonly HotkeyBox hotkey;
-        readonly ComboBox lang;
+        readonly ComboBox lang, format, proxyMode;
+        readonly NumericUpDown quality;
+        readonly TextBox proxyAddr, proxyUser, proxyPass;
+        readonly CheckBox notify;
         public bool LanguageChanged;
         readonly ListBox list;
 
@@ -135,6 +138,13 @@ namespace Kadr
             Lay.Dialog(this, L.T("Кадр — настройки"));
 
             var root = Lay.Table(1);
+            var cols = Lay.Table(2);
+            var left = Lay.Table(1);
+            var right = Lay.Table(1);
+            left.Margin = new Padding(0, 0, UI.S(10), 0);
+            cols.Controls.Add(left, 0, 0);
+            cols.Controls.Add(right, 1, 0);
+            root.Controls.Add(cols);
 
             // Upload
             var up = Lay.Table(2);
@@ -149,7 +159,7 @@ namespace Kadr
             Lay.Row(up, new Label(), Lay.Hint(L.T("Catbox работает без регистрации, ссылки вечные. Для Imgur нужен Client ID."), 300));
             Lay.Row(up, copyLink);
             Lay.Row(up, openBrowser);
-            root.Controls.Add(Lay.Group(L.T("Загрузка"), up));
+            left.Controls.Add(Lay.Group(L.T("Загрузка"), up));
 
             // Own services
             var own = Lay.Table(2);
@@ -161,8 +171,26 @@ namespace Kadr
             col.Controls.Add(Lay.Button(L.T("Удалить"), (o, e) => DeleteSelected()));
             col.Controls.Add(Lay.Button(L.T("Импорт .sxcu…"), (o, e) => Import()));
             Lay.Row(own, list, col);
-            Lay.Row(own, Lay.Hint(L.T("Любой сайт, который принимает картинку по HTTP: свой сервер, Catbox, ImgBB, Zipline и т. п. Готовые настройки ShareX (.sxcu) можно импортировать."), 440));
-            root.Controls.Add(Lay.Group(L.T("Свои сервисы для загрузки"), own));
+            Lay.Row(own, Lay.Hint(L.T("Любой сайт, который принимает картинку по HTTP: свой сервер, Catbox, ImgBB, Zipline и т. п. Готовые настройки ShareX (.sxcu) можно импортировать."), 420));
+            left.Controls.Add(Lay.Group(L.T("Свои сервисы для загрузки"), own));
+
+            // Proxy
+            var px = Lay.Table(2);
+            proxyMode = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = UI.S(200), Margin = new Padding(0, UI.S(3), 0, UI.S(3)) };
+            proxyMode.Items.AddRange(new object[] { L.T("Как в Windows"), L.T("Без прокси"), L.T("Свой прокси") });
+            proxyMode.SelectedIndex = s.ProxyMode == "none" ? 1 : s.ProxyMode == "custom" ? 2 : 0;
+            proxyAddr = Lay.Text(260, s.ProxyAddress);
+            proxyUser = Lay.Text(120, s.ProxyUser);
+            proxyPass = Lay.Text(120, Secret.Unprotect(s.ProxyPassword));
+            proxyPass.UseSystemPasswordChar = true;
+            Lay.Row(px, Lay.Label(L.T("Прокси:")), proxyMode);
+            Lay.Row(px, Lay.Label(L.T("Адрес:")), proxyAddr);
+            Lay.Row(px, Lay.Label(L.T("Логин:")), Lay.Flow(proxyUser, Lay.Label(L.T("Пароль:")), proxyPass));
+            Lay.Row(px, new Label(), Lay.Hint(L.T("Например 192.168.1.10:8080. Логин и пароль — если прокси их просит; пароль хранится зашифрованным."), 300));
+            EventHandler pxState = (o, e) => { bool on = proxyMode.SelectedIndex == 2; proxyAddr.Enabled = proxyUser.Enabled = proxyPass.Enabled = on; };
+            proxyMode.SelectedIndexChanged += pxState;
+            pxState(null, null);
+            left.Controls.Add(Lay.Group(L.T("Прокси для загрузки"), px));
 
             // Saving
             var sv = Lay.Table(2);
@@ -170,7 +198,17 @@ namespace Kadr
             Lay.Row(sv, Lay.Label(L.T("Папка:")), Lay.Flow(folder, Lay.Button(L.T("Обзор…"), (o, e) => PickFolder())));
             askName = Lay.Check(L.T("Спрашивать имя файла при сохранении (Ctrl+S)"), s.AskFileName);
             Lay.Row(sv, askName);
-            root.Controls.Add(Lay.Group(L.T("Сохранение"), sv));
+            format = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = UI.S(80), Margin = new Padding(0, UI.S(3), UI.S(12), UI.S(3)) };
+            format.Items.AddRange(new object[] { "PNG", "JPG" });
+            format.SelectedIndex = s.Jpeg ? 1 : 0;
+            quality = new NumericUpDown { Minimum = 50, Maximum = 100, Value = Math.Max(50, Math.Min(100, s.JpegQuality)), Width = UI.S(60), Margin = new Padding(0, UI.S(3), 0, UI.S(3)) };
+            var qLabel = Lay.Label(L.T("Качество JPG:"));
+            EventHandler fmtState = (o, e) => { quality.Enabled = qLabel.Enabled = format.SelectedIndex == 1; };
+            format.SelectedIndexChanged += fmtState;
+            fmtState(null, null);
+            Lay.Row(sv, Lay.Label(L.T("Формат:")), Lay.Flow(format, qLabel, quality));
+            Lay.Row(sv, new Label(), Lay.Hint(L.T("Для сохранения и загрузки снимков. PNG — без потерь, JPG — файл меньше."), 300));
+            right.Controls.Add(Lay.Group(L.T("Сохранение"), sv));
 
             // General
             var gen = Lay.Table(1);
@@ -188,7 +226,9 @@ namespace Kadr
             Lay.Row(gen, Lay.Hint(L.T("Щёлкни в поле и нажми нужное сочетание, например Shift+PageUp. Пока открыто это окно, сочетание не срабатывает."), 440));
             Lay.Row(gen, autostart);
             Lay.Row(gen, sendTo);
-            root.Controls.Add(Lay.Group(L.T("Общее"), gen));
+            notify = Lay.Check(L.T("Показывать уведомления (об ошибках — всегда)"), s.ShowNotifications);
+            Lay.Row(gen, notify);
+            right.Controls.Add(Lay.Group(L.T("Общее"), gen));
 
             var ok = Lay.Button(L.T("Сохранить"), (o, e) => SaveAndClose());
             var cancel = Lay.Button(L.T("Отмена"), (o, e) => Close());
@@ -300,6 +340,20 @@ namespace Kadr
 
         void SaveAndClose()
         {
+            if (proxyMode.SelectedIndex == 2 && Uploader.ProxyUri(proxyAddr.Text) == null)
+            {
+                MessageBox.Show(this, L.T("Адрес прокси не похож на настоящий. Пример: 192.168.1.10:8080"), L.T("Кадр"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                proxyAddr.Focus();
+                return;
+            }
+            S.ImageFormat = format.SelectedIndex == 1 ? "jpg" : "png";
+            S.JpegQuality = (int)quality.Value;
+            S.ShowNotifications = notify.Checked;
+            S.ProxyMode = proxyMode.SelectedIndex == 1 ? "none" : proxyMode.SelectedIndex == 2 ? "custom" : "system";
+            S.ProxyAddress = proxyAddr.Text.Trim();
+            S.ProxyUser = proxyUser.Text.Trim();
+            S.ProxyPassword = Secret.Protect(proxyPass.Text);
+            Uploader.Configure(S);
             if (hookKey.Checked && !Settings.HotkeyAllowed(hotkey.Value))
             {
                 MessageBox.Show(this, L.F("Сочетание «{0}» мешало бы печатать. Добавь Ctrl, Alt или Shift (например Shift+PageUp) или возьми F1–F12, PrtScn, Pause, Insert, PageUp.", Settings.KeyText(hotkey.Value)), L.T("Кадр"), MessageBoxButtons.OK, MessageBoxIcon.Warning);

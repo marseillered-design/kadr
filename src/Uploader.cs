@@ -25,11 +25,38 @@ namespace Kadr
 
     static class Uploader
     {
-        static readonly HttpClient Http = CreateClient();
+        static HttpClient Http = CreateClient(null);
 
-        static HttpClient CreateClient()
+        /// <summary>Applies the proxy choice; uploads already running keep their old connection.</summary>
+        public static void Configure(Settings s) { Http = CreateClient(s); }
+
+        /// <summary>"10.0.0.1:8080" → http://10.0.0.1:8080; null if it is not a usable address.</summary>
+        public static Uri ProxyUri(string address)
         {
-            var c = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
+            string a = (address ?? "").Trim();
+            if (a.Length == 0) return null;
+            if (!a.Contains("://")) a = "http://" + a;
+            Uri u;
+            if (!Uri.TryCreate(a, UriKind.Absolute, out u) || (u.Scheme != "http" && u.Scheme != "https") || string.IsNullOrEmpty(u.Host)) return null;
+            return u;
+        }
+
+        static HttpClient CreateClient(Settings s)
+        {
+            var handler = new HttpClientHandler();
+            if (s != null && s.ProxyMode == "none") handler.UseProxy = false;
+            else if (s != null && s.ProxyMode == "custom")
+            {
+                var uri = ProxyUri(s.ProxyAddress);
+                if (uri != null)
+                {
+                    var proxy = new WebProxy(uri) { BypassProxyOnLocal = true };
+                    if (!string.IsNullOrEmpty(s.ProxyUser)) proxy.Credentials = new NetworkCredential(s.ProxyUser, Secret.Unprotect(s.ProxyPassword));
+                    handler.Proxy = proxy;
+                    handler.UseProxy = true;
+                }
+            }
+            var c = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(120) };
             c.DefaultRequestHeaders.UserAgent.ParseAdd("Kadr/1.0 (Windows)");
             return c;
         }

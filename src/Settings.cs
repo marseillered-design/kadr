@@ -81,6 +81,21 @@ namespace Kadr
         public int PenColor { get; set; }
         public int PenSize { get; set; }
         public List<CustomUploader> Uploaders { get; set; }
+        /// <summary>"png" or "jpg": for saving and uploading screenshots.</summary>
+        public string ImageFormat { get; set; }
+        public int JpegQuality { get; set; }
+        /// <summary>Success notices (uploaded, saved, started). Errors are always shown.</summary>
+        public bool ShowNotifications { get; set; }
+        /// <summary>"system" (as in Windows), "none" or "custom".</summary>
+        public string ProxyMode { get; set; }
+        public string ProxyAddress { get; set; }
+        public string ProxyUser { get; set; }
+        /// <summary>Encrypted for this Windows user (DPAPI), base64.</summary>
+        public string ProxyPassword { get; set; }
+
+        public bool Jpeg { get { return ImageFormat == "jpg"; } }
+        public string Ext { get { return Jpeg ? ".jpg" : ".png"; } }
+
         /// <summary>"ru", "uk", "en", "de", "fr", "es", "it"; empty = the Windows language.</summary>
         public string Language { get; set; }
 
@@ -97,6 +112,13 @@ namespace Kadr
             PenSize = 4;
             Uploaders = new List<CustomUploader>();
             Language = "";
+            ImageFormat = "png";
+            JpegQuality = 90;
+            ShowNotifications = true;
+            ProxyMode = "system";
+            ProxyAddress = "";
+            ProxyUser = "";
+            ProxyPassword = "";
         }
 
         public static string Dir
@@ -128,6 +150,11 @@ namespace Kadr
                     if (s.PenSize < 1 || s.PenSize > 20) s.PenSize = 4;
                     if (string.IsNullOrEmpty(s.SaveFolder)) s.SaveFolder = new Settings().SaveFolder;
                     if (!HotkeyAllowed(s.Hotkey)) s.Hotkey = new Settings().Hotkey;
+                    if (s.ImageFormat != "jpg") s.ImageFormat = "png";
+                    if (s.JpegQuality < 50 || s.JpegQuality > 100) s.JpegQuality = 90;
+                    if (s.ProxyMode != "none" && s.ProxyMode != "custom") s.ProxyMode = "system";
+                    if (!raw.Contains("\"ShowNotifications\"")) s.ShowNotifications = true;
+                    Uploader.Configure(s);
                     return s;
                 }
             }

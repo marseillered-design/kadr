@@ -3,7 +3,7 @@ param([string]$TestOut = "")
 $ErrorActionPreference = "Stop"
 $root = $PSScriptRoot
 $csc = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
-$refs = "/r:System.dll", "/r:System.Core.dll", "/r:System.Drawing.dll", "/r:System.Windows.Forms.dll", "/r:System.Net.Http.dll", "/r:System.Web.Extensions.dll"
+$refs = "/r:System.dll", "/r:System.Core.dll", "/r:System.Drawing.dll", "/r:System.Windows.Forms.dll", "/r:System.Net.Http.dll", "/r:System.Web.Extensions.dll", "/r:System.Security.dll"
 $src = Get-ChildItem "$root\src\*.cs" | ForEach-Object { $_.FullName }
 $common = @("/nologo", "/codepage:65001", "/optimize+", "/platform:anycpu", "/win32manifest:$root\app.manifest") + $refs
 
