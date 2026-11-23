@@ -19,6 +19,29 @@ a = Analysis(
     excludes=["tkinter", "PySide6.QtQml", "PySide6.QtQuick", "PySide6.QtWebEngineCore", "PySide6.QtMultimedia",
               "PySide6.Qt3DCore", "PySide6.QtCharts", "PySide6.QtPdf", "PySide6.QtSql", "PySide6.QtTest"],
 )
+# Smaller installers: drop the parts of Qt that Kadr never uses. Kept on purpose: QtNetwork (single-instance
+# messages), QtDBus (Linux tray), QtSvg + iconengines (icons in file dialogs), platforminputcontexts (typing in
+# other alphabets), wayland/xcb platform plugins, offscreen (build self-tests).
+import re
+
+_DROP = [
+    r"Qt6?(Quick|Qml|QmlModels|QmlMeta|QmlWorkerScript|VirtualKeyboard|Pdf|Designer|Help|UiTools|Sql|Test|Concurrent|StateMachine)",
+    r"qml/", r"/(tls|networkinformation|generic|sqldrivers|position|virtualkeyboard)/",
+    r"plugins/imageformats/.*(tiff|webp|icns|pdf|wbmp|tga|heif|jp2|macjp2)",
+    r"plugins/platforms/.*(vnc|linuxfb|eglfs|minimalegl|minimal\b)",
+    r"plugins/platforminputcontexts/.*virtualkeyboard",
+    r"translations/(?!qtbase_(ru|uk|de|fr|es|it)\.qm)",
+]
+
+
+def _keep(entry):
+    name = entry[0].replace("\\", "/")
+    return not any(re.search(pat, name, re.I) for pat in _DROP)
+
+
+a.binaries = [b for b in a.binaries if _keep(b)]
+a.datas = [d for d in a.datas if _keep(d)]
+
 pyz = PYZ(a.pure)
 exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name="Kadr" if mac else "kadr", console=False,
           icon="../icons/kadr-mac-1024.png" if mac else "../icons/kadr-256.png", argv_emulation=False)

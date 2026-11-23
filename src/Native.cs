@@ -53,6 +53,25 @@ namespace Kadr
             using (var g = Graphics.FromHwnd(IntPtr.Zero)) return g.DpiX / 96f;
         }
 
+        [DllImport("kernel32.dll")] static extern IntPtr GetCurrentProcess();
+        [DllImport("kernel32.dll")] static extern bool SetProcessWorkingSetSize(IntPtr process, IntPtr min, IntPtr max);
+
+        /// <summary>
+        /// Frees what a capture used (the full-screen bitmaps are large) and hands unused pages back to Windows,
+        /// so Kadr waiting in the tray stays small.
+        /// </summary>
+        public static void TrimMemory()
+        {
+            try
+            {
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                GC.Collect();
+                SetProcessWorkingSetSize(GetCurrentProcess(), (IntPtr)(-1), (IntPtr)(-1));
+            }
+            catch { }
+        }
+
         public static void RoundCorners(IntPtr hwnd)
         {
             try { int v = 2; DwmSetWindowAttribute(hwnd, 33, ref v, 4); } catch { }

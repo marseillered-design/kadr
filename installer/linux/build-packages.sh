@@ -45,6 +45,6 @@ chmod +x after.sh
 COMMON=(-s dir -n kadr -v "$VER" --description "Kadr: screenshots with drawing tools and upload to Catbox, Imgur or your own service"
         --url "https://github.com/marseillered-design/kadr" --maintainer "Kadr" --vendor "Kadr"
         --after-install after.sh --after-remove after.sh -C pkgroot)
-fpm "${COMMON[@]}" -t deb -a amd64 --deb-no-default-config-files -p "Kadr-Linux-amd64.deb" .
-fpm "${COMMON[@]}" -t rpm -a x86_64 --rpm-os linux -p "Kadr-Linux-x86_64.rpm" .
+fpm "${COMMON[@]}" -t deb -a amd64 --deb-compression xz --deb-no-default-config-files -p "Kadr-Linux-amd64.deb" .
+fpm "${COMMON[@]}" -t rpm -a x86_64 --rpm-compression xz --rpm-os linux -p "Kadr-Linux-x86_64.rpm" .
 ls -la Kadr-Linux-*

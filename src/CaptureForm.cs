@@ -27,7 +27,8 @@ namespace Kadr
         public string Action;
         public string Destination;
 
-        readonly Bitmap shot, dim;
+        readonly Bitmap shot;
+        static readonly SolidBrush Dim = new SolidBrush(Color.FromArgb(115, 0, 0, 0));
         readonly Rectangle vs;
         readonly Settings S;
         readonly List<string> dests;
@@ -82,14 +83,7 @@ namespace Kadr
             size = s.PenSize;
             k = scale ?? Native.ScaleAt(Cursor.Position);
 
-            dim = new Bitmap(shot.Width, shot.Height, PixelFormat.Format32bppPArgb);
-            using (var g = Graphics.FromImage(dim))
-            {
-                g.CompositingMode = CompositingMode.SourceCopy;
-                g.DrawImage(shot, new Rectangle(0, 0, shot.Width, shot.Height), 0, 0, shot.Width, shot.Height, GraphicsUnit.Pixel);
-                g.CompositingMode = CompositingMode.SourceOver;
-                using (var b = new SolidBrush(Color.FromArgb(115, 0, 0, 0))) g.FillRectangle(b, 0, 0, dim.Width, dim.Height);
-            }
+            // No darkened copy of the screen: the dimming is painted on the fly (saves a full-screen bitmap and time).
 
             uiFont = new Font("Segoe UI", 12.5f * k, FontStyle.Regular, GraphicsUnit.Pixel);
             tipFont = new Font("Segoe UI", 12f * k, FontStyle.Regular, GraphicsUnit.Pixel);
@@ -132,7 +126,6 @@ namespace Kadr
         {
             timer.Stop();
             timer.Dispose();
-            dim.Dispose();
             shot.Dispose();
             base.OnFormClosed(e);
         }
@@ -317,13 +310,13 @@ namespace Kadr
             g.CompositingMode = CompositingMode.SourceCopy;
             g.InterpolationMode = InterpolationMode.NearestNeighbor;
             g.PixelOffsetMode = PixelOffsetMode.Half;
-            g.DrawImage(dim, clip, clip.X, clip.Y, clip.Width, clip.Height, GraphicsUnit.Pixel);
-            if (hasSel)
-            {
-                var r = Rectangle.Intersect(sel, clip);
-                if (r.Width > 0 && r.Height > 0) g.DrawImage(shot, r, r.X, r.Y, r.Width, r.Height, GraphicsUnit.Pixel);
-            }
+            g.DrawImage(shot, clip, clip.X, clip.Y, clip.Width, clip.Height, GraphicsUnit.Pixel);
             g.CompositingMode = CompositingMode.SourceOver;
+            using (var dark = new Region(clip))
+            {
+                if (hasSel) dark.Exclude(sel);
+                g.FillRegion(Dim, dark);
+            }
             g.PixelOffsetMode = PixelOffsetMode.Default;
             g.SmoothingMode = SmoothingMode.AntiAlias;
             g.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;

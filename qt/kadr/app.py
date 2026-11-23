@@ -290,6 +290,7 @@ class KadrApp(QObject):
     def _captured(self, action, img, dest):
         self.session = None
         self.S.save()
+        QTimer.singleShot(1500, trim_memory)
         if not action or img is None:
             return
         if action == "copy":
@@ -480,6 +481,30 @@ def _describe(e: Exception) -> str:
     return str(e)
 
 
+def trim_memory():
+    """The monitor pictures of a capture are big: collect them now and hand the memory back to the system."""
+    import gc
+    gc.collect()
+    if platform_utils.LINUX:
+        try:
+            import ctypes
+            ctypes.CDLL("libc.so.6").malloc_trim(0)
+        except Exception:
+            pass
+
+
+def install_qt_translation(qapp):
+    """Standard Qt texts (file and print dialogs on Linux) in the interface language."""
+    from PySide6.QtCore import QLibraryInfo, QTranslator
+    if i18n.current() == "en":
+        return None
+    tr = QTranslator(qapp)
+    if tr.load("qtbase_" + i18n.current(), QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath)):
+        qapp.installTranslator(tr)
+        return tr
+    return None
+
+
 class _FileOpenFilter(QObject):
     """macOS 'Open With → Kadr' and dropping files on the app icon."""
 
@@ -504,6 +529,9 @@ def main(argv=None):
     if argv[:1] == ["--render-test"]:
         from .selftest import render_test
         return render_test(argv[1])
+    if argv[:1] == ["--paint-check"]:
+        from .paintcheck import run
+        return run()
     if argv[:1] == ["--upload-test"]:
         from .selftest import upload_test
         return upload_test(argv[1], argv[2])
@@ -529,6 +557,8 @@ def main(argv=None):
     qapp.installEventFilter(file_filter)
 
     kadr = KadrApp(qapp, quiet="--tray" in argv)
+    kadr._qt_tr = install_qt_translation(qapp)
+    QTimer.singleShot(4000, trim_memory)
     file_filter.app = kadr
     for pth in file_filter.pending:
         kadr.upload_files([pth])

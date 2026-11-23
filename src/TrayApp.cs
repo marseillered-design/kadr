@@ -300,6 +300,15 @@ namespace Kadr
             }
             else if (!quiet && S.ShowNotifications)
                 Toast.Info(null, L.T("Кадр работает"), S.HookPrintScreen ? L.F("{0} — снимок экрана.", Settings.KeyText(S.Hotkey)) : L.T("Снимок — щелчок по значку у часов."), null, 5);
+            TrimSoon(3000);
+        }
+
+        /// <summary>Frees memory a little after something big closed, unless a capture is open again.</summary>
+        void TrimSoon(int ms = 1500)
+        {
+            var t = new System.Windows.Forms.Timer { Interval = ms };
+            t.Tick += (s, e) => { t.Dispose(); if (capture == null) Native.TrimMemory(); };
+            t.Start();
         }
 
         ContextMenuStrip BuildMenu()
@@ -353,6 +362,7 @@ namespace Kadr
         public void StartCapture(bool fullScreen)
         {
             if (capture != null) { capture.Activate(); return; }
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             Rectangle vs = SystemInformation.VirtualScreen;
             Bitmap bmp;
             try
@@ -373,10 +383,29 @@ namespace Kadr
                 b.Offset(-vs.X, -vs.Y);
                 init = b;
             }
-            capture = new CaptureForm(S, bmp, vs, init, S.Destinations(), null, WindowList.Get(vs));
+            long tGrab = sw.ElapsedMilliseconds;
+            var wins = WindowList.Get(vs);
+            long tWins = sw.ElapsedMilliseconds;
+            capture = new CaptureForm(S, bmp, vs, init, S.Destinations(), null, wins);
+            long tForm = sw.ElapsedMilliseconds;
             capture.FormClosed += OnCaptureClosed;
+            Timing(capture, sw, tGrab, tWins, tForm);
             capture.Show();
             SelfTest(capture, vs);
+        }
+
+        /// <summary>Build check only: with KADR_TIMING set, logs how long each capture step took and closes the overlay.</summary>
+        static void Timing(CaptureForm f, System.Diagnostics.Stopwatch sw, long grab, long wins, long form)
+        {
+            string file = Environment.GetEnvironmentVariable("KADR_TIMING");
+            if (string.IsNullOrEmpty(file)) return;
+            f.Shown += (s, e) =>
+            {
+                f.Update();
+                long shown = sw.ElapsedMilliseconds;
+                File.AppendAllText(file, string.Format("grab={0} windows={1} form={2} shown+painted={3}\r\n", grab, wins - grab, form - wins, shown));
+                f.BeginInvoke((Action)(() => f.Close()));
+            };
         }
 
         /// <summary>Build-time check only: with KADR_SELFTEST set, saves what the overlay shows and closes it.</summary>
@@ -410,6 +439,7 @@ namespace Kadr
             var f = capture;
             capture = null;
             S.Save();
+            TrimSoon();
             var bmp = f.Output;
             if (bmp == null) return;
             switch (f.Action)
@@ -439,6 +469,7 @@ namespace Kadr
             byte[] data = Imaging.Encode(S, bmp);
             await Actions.Upload(S, data, Imaging.ShotName(S.Ext), dest, bmp, true);
             bmp.Dispose();
+            TrimSoon();
         }
 
         async void UploadFromDisk()
@@ -492,6 +523,7 @@ namespace Kadr
                     tray.ContextMenuStrip = BuildMenu();
                     old.Dispose();
                 }
+                TrimSoon();
                 ApplyHook();
             };
             settingsForm.Show();
@@ -502,7 +534,7 @@ namespace Kadr
         {
             if (historyForm != null) { historyForm.Activate(); return; }
             historyForm = new HistoryForm(S);
-            historyForm.FormClosed += (s, e) => historyForm = null;
+            historyForm.FormClosed += (s, e) => { historyForm = null; TrimSoon(); };
             historyForm.Show();
             Native.ForceForeground(historyForm.Handle);
         }

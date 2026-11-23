@@ -27,6 +27,8 @@ jobs:
       - run: pip install -r requirements.txt pyinstaller
       - name: Self-test (draws the overlay, dialogs and notices)
         run: QT_QPA_PLATFORM=offscreen KADR_LANG=ru python -m kadr --render-test selftest
+      - name: Repaint check (simulated mouse and keys, no stale areas)
+        run: QT_QPA_PLATFORM=offscreen python -m kadr --paint-check
       - run: pyinstaller --noconfirm kadr.spec
       - name: Self-test of the built program
         run: QT_QPA_PLATFORM=offscreen KADR_LANG=uk dist/kadr/kadr --render-test selftest-built
@@ -79,6 +81,8 @@ jobs:
       - run: pip install -r requirements.txt pyinstaller pillow
       - name: Self-test (draws the overlay, dialogs and notices)
         run: QT_QPA_PLATFORM=offscreen KADR_LANG=ru python -m kadr --render-test selftest
+      - name: Repaint check (simulated mouse and keys, no stale areas)
+        run: QT_QPA_PLATFORM=offscreen python -m kadr --paint-check
       - run: |
           sed -i '' "s/\"CFBundleShortVersionString\": \"1.0.0\"/\"CFBundleShortVersionString\": \"${VERSION#v}\"/" kadr.spec
           pyinstaller --noconfirm kadr.spec
@@ -100,6 +104,9 @@ jobs:
             ln -s /Applications dmgsrc/Applications
             hdiutil create -volname Kadr -srcfolder dmgsrc -ov -format UDZO "$DMG"
           fi
+          # recompress with LZMA (smaller; opens on macOS 10.15+, Kadr needs 11+)
+          hdiutil convert "$DMG" -format ULMO -o small.dmg && mv -f small.dmg "$DMG"
+          ls -la "$DMG"
       - uses: actions/upload-artifact@v4
         with: { name: "Kadr-macOS-${{ matrix.arch }}", path: "qt/Kadr-macOS-${{ matrix.arch }}.dmg" }
       - uses: actions/upload-artifact@v4

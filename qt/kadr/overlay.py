@@ -24,14 +24,10 @@ class Shot:
     def __init__(self, screen, geometry: QRect, image: QImage):
         self.screen = screen
         self.geo = QRect(geometry)
-        self.image = image
         self.dpr = image.devicePixelRatio() or 1.0
-        dim = image.convertToFormat(QImage.Format.Format_ARGB32_Premultiplied)
-        dim.setDevicePixelRatio(self.dpr)
-        p = QPainter(dim)
-        p.fillRect(QRectF(0, 0, dim.width(), dim.height()), QColor(0, 0, 0, 115))
-        p.end()
-        self.dim = dim
+        # premultiplied ARGB is what the raster painter draws without converting; the dimming is painted on the fly
+        self.image = image.convertToFormat(QImage.Format.Format_ARGB32_Premultiplied)
+        self.image.setDevicePixelRatio(self.dpr)
 
 
 class Btn:
@@ -181,8 +177,42 @@ class CaptureSession(QObject):
             w.update()
 
     def update_active(self):
-        if self.wins:
+        """The selection and what is around it, on the monitor that holds it."""
+        if self.wins and self.has_sel:
+            self.update_rect(self.active, self.sel.adjusted(-12, -12, 12, 12))
+        elif self.wins:
             self.wins[self.active].update()
+
+    def update_rect(self, i, r: QRectF):
+        if 0 <= i < len(self.wins) and not r.isEmpty():
+            self.wins[i].update(r.toAlignedRect().adjusted(-2, -2, 2, 2))
+
+    def hint_rect(self, i) -> QRectF:
+        mon = self.screen_rect(i)
+        return QRectF(mon.x() + mon.width() / 2 - 450, mon.y() + 36, 900, 52)
+
+    def frame_rect(self) -> QRectF:
+        """Everything that moves with the selection: frame, size label, toolbars and their tips, palette,
+        size tip, magnifier, hint."""
+        r = QRectF()
+
+        def add(x):
+            nonlocal r
+            if not x.isEmpty():
+                r = x if r.isEmpty() else r.united(x)
+
+        if self.has_sel:
+            add(self.sel.adjusted(-12, -36, 12, 12))
+            add(QRectF(self.sel.left(), self.sel.top() - 36, 220, 70))
+        if not self.tools_bar.isEmpty():
+            add(self.tools_bar.united(self.actions_bar).adjusted(-300, -50, 300, 50))
+        if not self.palette_rect.isEmpty():
+            add(self.palette_rect.adjusted(-6, -6, 6, 6))
+        if self.size_tip:
+            add(QRectF(self.mouse.x() - 80, self.mouse.y() - 80, 320, 160))
+        if self.loupe_visible():
+            add(self.loupe_rect(self.mouse, self.mouse_screen).adjusted(-6, -6, 8, 8))
+        return r
 
     # ---------------- toolbar layout ----------------
 
@@ -252,19 +282,33 @@ class CaptureSession(QObject):
 
     def refresh(self):
         self.layout()
-        self.update_all()
+        if getattr(self, "_last_active", None) != self.active or getattr(self, "_last_has_sel", None) != self.has_sel:
+            self.update_all()                       # the selection moved to another monitor, or appeared/vanished
+        else:
+            f = self.frame_rect()
+            last = getattr(self, "_last_frame", QRectF())
+            r = f if last.isEmpty() else (last if f.isEmpty() else f.united(last))
+            self.update_rect(self.active, r)
+            if self.mouse_screen != self.active:
+                self.update_rect(self.mouse_screen, r)
+        self._last_frame = self.frame_rect()
+        self._last_active = self.active
+        self._last_has_sel = self.has_sel
 
     # ---------------- painting ----------------
 
     def paint(self, i, p: QPainter, clip: QRect):
         shot = self.shots[i]
         p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, False)
-        p.drawImage(QPointF(0, 0), shot.dim)
+        p.drawImage(QPointF(0, 0), shot.image)
         on_active = i == self.active
+        shade = QPainterPath()
+        shade.addRect(self.screen_rect(i))
         if self.has_sel and on_active:
-            dpr = shot.dpr
-            s = self.sel
-            p.drawImage(s, shot.image, QRectF(s.x() * dpr, s.y() * dpr, s.width() * dpr, s.height() * dpr))
+            hole = QPainterPath()
+            hole.addRect(self.sel)
+            shade = shade.subtracted(hole)
+        p.fillPath(shade, QColor(0, 0, 0, 115))
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         p.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
 
@@ -639,7 +683,7 @@ class CaptureSession(QObject):
 
     def mouse_move(self, i, e):
         pt = e.position()
-        old_screen = self.mouse_screen
+        old_screen, old_mouse = self.mouse_screen, QPointF(self.mouse)
         self.mouse, self.mouse_screen = pt, i
         if old_screen != i:
             self.wins[old_screen].update()
@@ -676,18 +720,27 @@ class CaptureSession(QObject):
             self.update_shape(pt, bool(e.modifiers() & Qt.KeyboardModifier.ShiftModifier))
             return
 
+        if self.loupe_visible():
+            self.update_rect(old_screen, self.loupe_rect(old_mouse, old_screen).adjusted(-6, -6, 8, 8))
+            self.update_rect(i, self.loupe_rect(pt, i).adjusted(-6, -6, 8, 8))
         if not self.has_sel:
             hw = QRectF()
             for r in self.local_windows(i):
                 if r.contains(pt):
                     hw = r
                     break
-            self.hover_win = hw
+            if hw != self.hover_win or old_screen != i:
+                for scr, w in ((old_screen, self.hover_win), (i, hw)):
+                    if not w.isEmpty():
+                        self.update_rect(scr, w.adjusted(-4, -34, 4, 4))
+                self.hover_win = hw
         hb = self.hit_button(pt) if i == self.active else None
         if hb is not self.hover_btn:
             self.hover_btn = hb
+            self.refresh()
+        if self.size_tip:
+            self.refresh()
         self.update_cursor(i, pt)
-        self.wins[i].update()
 
     def mouse_release(self, i, e):
         if e.button() != Qt.MouseButton.LeftButton:
@@ -719,7 +772,9 @@ class CaptureSession(QObject):
             self.editing.size = ns
         self.size_tip = F("Размер {0}", ns)
         self.size_tip_until = self.ticks + 9
-        self.update_all()
+        self.refresh()
+        if self.editing is not None:
+            self.update_rect(self.active, self.editing.bounds().adjusted(-40, -40, 200, 120))
 
     # ---------------- shapes ----------------
 
@@ -752,6 +807,11 @@ class CaptureSession(QObject):
         cur = self.cur
         if cur is None:
             return
+        before = cur.bounds() if not isinstance(cur, Stroke) else QRectF()
+        if isinstance(cur, Stroke) and cur.points:
+            w = cur.width() + 4
+            last = cur.points[-1]
+            before = QRectF(last.x() - w, last.y() - w, 2 * w, 2 * w)
         if isinstance(cur, Stroke):
             last = cur.points[-1]
             if abs(last.x() - pt.x()) + abs(last.y() - pt.y()) < 2:
@@ -774,7 +834,8 @@ class CaptureSession(QObject):
             cur.b = QPointF(pt)
         elif isinstance(cur, Step):
             cur.center = QPointF(pt)
-        self.update_active()
+        r = cur.bounds()
+        self.update_rect(self.active, (r if before.isEmpty() else r.united(before)).adjusted(-4, -4, 4, 4))
 
     def commit_text(self):
         t = self.editing
@@ -804,10 +865,11 @@ class CaptureSession(QObject):
         self.ticks += 1
         if self.editing is not None and self.ticks % 5 == 0:
             self.editing.caret = not self.editing.caret
-            self.update_active()
+            self.update_rect(self.active, self.editing.bounds())
         if self.size_tip and self.ticks > self.size_tip_until:
+            self.size_tip_area = QRectF(self.mouse.x() - 80, self.mouse.y() - 80, 320, 160)
             self.size_tip = None
-            self.update_all()
+            self.update_rect(self.mouse_screen, self.size_tip_area)
 
     # ---------------- commands ----------------
 
