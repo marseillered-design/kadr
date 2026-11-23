@@ -9,7 +9,7 @@ using System.Windows.Forms;
 
 namespace Kadr
 {
-    enum Cmd { Tool, Color, Undo, Upload, UploadMenu, Copy, Save, Close }
+    enum Cmd { Tool, Color, Undo, Upload, UploadMenu, Copy, Save, Print, Close }
 
     class Btn
     {
@@ -175,10 +175,11 @@ namespace Kadr
                 new Btn { Cmd = Cmd.UploadMenu, Tip = L.T("Выбрать, куда загрузить") },
                 new Btn { Cmd = Cmd.Copy, Tip = L.T("Копировать (Ctrl+C)") },
                 new Btn { Cmd = Cmd.Save, Tip = L.T("Сохранить (Ctrl+S)") },
+                new Btn { Cmd = Cmd.Print, Tip = L.T("Печать (Ctrl+P)") },
                 new Btn { Cmd = Cmd.Close, Tip = L.T("Закрыть (Esc)") },
             };
 
-            int aw = 4 * bs + narrow + 2 * pad, ah = bs + 2 * pad;
+            int aw = (actions.Length - 1) * bs + narrow + 2 * pad, ah = bs + 2 * pad;
             int ax = sel.Right - aw, ay = sel.Bottom + gap;
             if (ay + ah > mon.Bottom - gap)
             {
@@ -447,6 +448,7 @@ namespace Kadr
                     case Cmd.UploadMenu: Glyph(g, "", cx, cy, Ink, iconFontSmall); break;
                     case Cmd.Copy: Glyph(g, "", cx, cy); break;
                     case Cmd.Save: Glyph(g, "", cx, cy); break;
+                    case Cmd.Print: Glyph(g, "\uE749", cx, cy); break;
                     case Cmd.Close: Glyph(g, "", cx, cy); break;
                 }
             }
@@ -825,6 +827,7 @@ namespace Kadr
                 case Cmd.UploadMenu: ShowUploadMenu(b); return;
                 case Cmd.Copy: Finish("copy", null); return;
                 case Cmd.Save: Finish("save", null); return;
+                case Cmd.Print: Finish("print", null); return;
                 case Cmd.Close: Cancel(); return;
             }
             Refresh2();
@@ -923,6 +926,7 @@ namespace Kadr
                 {
                     case Keys.C: if (hasSel) Finish("copy", null); return true;
                     case Keys.S: if (hasSel) Finish("save", null); return true;
+                    case Keys.P: if (hasSel) Finish("print", null); return true;
                     case Keys.D: if (hasSel) Finish("upload", S.Default()); return true;
                     case Keys.Z: Undo(); return true;
                     case Keys.A: sel = MonitorOf(new Rectangle(mouse, new Size(1, 1))); hasSel = true; Invalidate(); Refresh2(); return true;

@@ -187,6 +187,42 @@ namespace Kadr
             t.SetButton("\uE838", () => Shell.ShowInFolder(path), false);
         }
 
+        /// <summary>
+        /// Prints the picture: the printer dialog first, landscape for wide shots, shrunk to fit the page
+        /// (never enlarged, so small shots stay sharp). pdfPath skips the dialog and prints to that PDF (self-test).
+        /// </summary>
+        public static void Print(Image img, string pdfPath)
+        {
+            using (var doc = new System.Drawing.Printing.PrintDocument())
+            {
+                doc.DocumentName = Imaging.ShotName("");
+                doc.DefaultPageSettings.Landscape = img.Width > img.Height;
+                doc.PrintPage += (o, e) =>
+                {
+                    var m = e.MarginBounds;
+                    float w = img.Width * 100f / 96f, h = img.Height * 100f / 96f;
+                    float k = Math.Min(1f, Math.Min(m.Width / w, m.Height / h));
+                    w *= k; h *= k;
+                    e.Graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                    e.Graphics.DrawImage(img, new RectangleF(m.Left + (m.Width - w) / 2, m.Top, w, h));
+                    e.HasMorePages = false;
+                };
+                if (pdfPath != null)
+                {
+                    doc.PrinterSettings.PrinterName = "Microsoft Print to PDF";
+                    doc.PrinterSettings.PrintToFile = true;
+                    doc.PrinterSettings.PrintFileName = pdfPath;
+                    doc.DefaultPageSettings.Landscape = img.Width > img.Height;
+                }
+                else
+                {
+                    using (var dlg = new PrintDialog { Document = doc, UseEXDialog = true, AllowSomePages = false, AllowSelection = false })
+                        if (dlg.ShowDialog() != DialogResult.OK) return;
+                }
+                doc.Print();
+            }
+        }
+
         public static async Task UploadFiles(Settings s, IEnumerable<string> files, string dest)
         {
             var links = new List<string>();
@@ -389,6 +425,11 @@ namespace Kadr
                     break;
                 case "upload":
                     UploadShot(bmp, f.Destination ?? S.Default());
+                    break;
+                case "print":
+                    try { Actions.Print(bmp, null); }
+                    catch (Exception ex) { Toast.Info(null, L.T("Не удалось напечатать"), ex.Message, null, 10); }
+                    bmp.Dispose();
                     break;
             }
         }

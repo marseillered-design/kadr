@@ -33,6 +33,7 @@ namespace Kadr
             if (args.Length >= 2 && args[0] == "--parse-test") { Console.WriteLine(Uploader.Parse(args[1], File.ReadAllText(args[2]))); return 0; }
             if (args.Length >= 3 && args[0] == "--upload-test") { return UploadTest(args[1], args[2]); }
             if (args.Length >= 2 && args[0] == "--form-test") { FormTest(args[1]); return 0; }
+            if (args.Length >= 3 && args[0] == "--print-test") { using (var img = Image.FromFile(args[1])) Actions.Print(img, args[2]); return 0; }
 
             var files = args.Where(a => !a.StartsWith("--") && File.Exists(a)).ToArray();
             if (files.Length > 0)
