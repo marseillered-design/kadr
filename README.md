@@ -4,6 +4,8 @@
 
 A screenshot tool for Windows, macOS and Linux in the spirit of Lightshot — but you choose where your screenshots go: Catbox, Imgur or any upload service of your own.
 
+**Open source** under the [MIT licence](LICENSE) — change anything you like: see [Make Kadr your own](CUSTOMIZING.md).
+
 ## Download
 
 Get the installer for your system from **Releases**:

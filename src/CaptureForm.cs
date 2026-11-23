@@ -63,6 +63,20 @@ namespace Kadr
         int ticks;
         readonly Font uiFont, tipFont, iconFont, iconFontSmall;
 
+        /// <summary>The colours from settings.json ("Palette"), or the built-in ones if none are valid.</summary>
+        Color[] palette_ = Colors;
+
+        static Color[] ParsePalette(List<string> hex)
+        {
+            var list = new List<Color>();
+            foreach (var h in hex ?? new List<string>())
+            {
+                try { list.Add(ColorTranslator.FromHtml(h.Trim())); } catch { }
+                if (list.Count == 12) break;
+            }
+            return list.Count > 0 ? list.ToArray() : Colors;
+        }
+
         static readonly Color[] Colors =
         {
             Color.FromArgb(229, 57, 53), Color.FromArgb(251, 140, 0), Color.FromArgb(253, 216, 53), Color.FromArgb(67, 160, 71),
@@ -75,6 +89,7 @@ namespace Kadr
         public CaptureForm(Settings s, Bitmap shot, Rectangle virtualScreen, Rectangle? initial, List<string> destinations, float? scale = null, List<Rectangle> windows = null)
         {
             S = s;
+            palette_ = ParsePalette(s.Palette);
             wins = windows ?? new List<Rectangle>();
             this.shot = shot;
             vs = virtualScreen;
@@ -220,12 +235,12 @@ namespace Kadr
             {
                 var cb = btns.First(b => b.Cmd == Cmd.Color).R;
                 int sw = Sc(26);
-                int pw = Colors.Length * sw + 2 * pad, ph = sw + 2 * pad;
+                int pw = palette_.Length * sw + 2 * pad, ph = sw + 2 * pad;
                 int px = toolsBar.Left - gap - pw;
                 if (px < mon.Left + gap) px = toolsBar.Right + gap;
                 paletteRect = new Rectangle(px, cb.Top + (cb.Height - ph) / 2, pw, ph);
-                for (int i = 0; i < Colors.Length; i++)
-                    swatches.Add(new KeyValuePair<Rectangle, Color>(new Rectangle(paletteRect.X + pad + i * sw, paletteRect.Y + pad, sw, sw), Colors[i]));
+                for (int i = 0; i < palette_.Length; i++)
+                    swatches.Add(new KeyValuePair<Rectangle, Color>(new Rectangle(paletteRect.X + pad + i * sw, paletteRect.Y + pad, sw, sw), palette_[i]));
             }
         }
 

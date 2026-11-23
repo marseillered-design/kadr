@@ -81,6 +81,8 @@ namespace Kadr
         public int PenColor { get; set; }
         public int PenSize { get; set; }
         public List<CustomUploader> Uploaders { get; set; }
+        /// <summary>Colours offered in the capture window, as #RRGGBB (up to 12). Editable in settings.json.</summary>
+        public List<string> Palette { get; set; }
         /// <summary>"png" or "jpg": for saving and uploading screenshots.</summary>
         public string ImageFormat { get; set; }
         public int JpegQuality { get; set; }
@@ -111,6 +113,7 @@ namespace Kadr
             PenColor = Color.FromArgb(229, 57, 53).ToArgb();
             PenSize = 4;
             Uploaders = new List<CustomUploader>();
+            Palette = new List<string> { "#E53935", "#FB8C00", "#FDD835", "#43A047", "#1E88E5", "#8E24AA", "#212121", "#FFFFFF" };
             Language = "";
             ImageFormat = "png";
             JpegQuality = 90;
@@ -146,6 +149,7 @@ namespace Kadr
                     if (!raw.Contains("\"Language\"")) s.Language = "ru";
                     L.Current = s.Language;
                     if (s.Uploaders == null) s.Uploaders = new List<CustomUploader>();
+                    if (s.Palette == null || s.Palette.Count == 0) s.Palette = new Settings().Palette;
                     foreach (var u in s.Uploaders) u.Normalize();
                     if (s.PenSize < 1 || s.PenSize > 20) s.PenSize = 4;
                     if (string.IsNullOrEmpty(s.SaveFolder)) s.SaveFolder = new Settings().SaveFolder;

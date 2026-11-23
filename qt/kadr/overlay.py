@@ -94,6 +94,8 @@ class CaptureSession(QObject):
         self.shots = shots
         self.windows_global = windows or []
         self.color = QColor(settings.PenColor)
+        # colours offered in the palette: settings.json "Palette" (up to 12), else the built-in ones
+        self.palette_colors = [c for c in (settings.data.get("Palette") or []) if QColor.isValidColorName(str(c))][:12] or COLORS
         self.size = settings.PenSize
         self.tool = None
         self.shapes = []
@@ -272,12 +274,12 @@ class CaptureSession(QObject):
         if self.palette:
             cb = next(b for b in self.btns if b.cmd == "color").r
             sw = 26.0
-            pw, ph = len(COLORS) * sw + 2 * pad, sw + 2 * pad
+            pw, ph = len(self.palette_colors) * sw + 2 * pad, sw + 2 * pad
             px = self.tools_bar.left() - gap - pw
             if px < mon.left() + gap:
                 px = self.tools_bar.right() + gap
             self.palette_rect = QRectF(px, cb.top() + (cb.height() - ph) / 2, pw, ph)
-            for i, c in enumerate(COLORS):
+            for i, c in enumerate(self.palette_colors):
                 self.swatches.append((QRectF(self.palette_rect.x() + pad + i * sw, self.palette_rect.y() + pad, sw, sw), QColor(c)))
 
     def refresh(self):

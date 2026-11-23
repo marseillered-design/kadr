@@ -13,4 +13,6 @@
 
 First launch: Kadr has no paid code signature. On Windows click **More info → Run anyway**; on macOS open **System Settings → Privacy & Security → Open Anyway**, then allow **Screen Recording**.
 
+Open source (MIT) — [make it your own](https://github.com/marseillered-design/kadr/blob/main/CUSTOMIZING.md).
+
 Full description: [README](https://github.com/marseillered-design/kadr#readme) · [по-русски](https://github.com/marseillered-design/kadr/blob/main/README.ru.md)
