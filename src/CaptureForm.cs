@@ -68,9 +68,13 @@ namespace Kadr
             Color.FromArgb(30, 136, 229), Color.FromArgb(142, 36, 170), Color.FromArgb(33, 33, 33), Color.White
         };
 
-        public CaptureForm(Settings s, Bitmap shot, Rectangle virtualScreen, Rectangle? initial, List<string> destinations, float? scale = null)
+        readonly List<Rectangle> wins;
+        Rectangle hoverWin, downWin;
+
+        public CaptureForm(Settings s, Bitmap shot, Rectangle virtualScreen, Rectangle? initial, List<string> destinations, float? scale = null, List<Rectangle> windows = null)
         {
             S = s;
+            wins = windows ?? new List<Rectangle>();
             this.shot = shot;
             vs = virtualScreen;
             dests = destinations;
@@ -163,9 +167,12 @@ namespace Kadr
                 new Btn { Cmd = Cmd.Tool, Tool = Tool.Line, Tip = L.T("Линия (L)") },
                 new Btn { Cmd = Cmd.Tool, Tool = Tool.Arrow, Tip = L.T("Стрелка (A)") },
                 new Btn { Cmd = Cmd.Tool, Tool = Tool.Rect, Tip = L.T("Прямоугольник (R)") },
+                new Btn { Cmd = Cmd.Tool, Tool = Tool.Ellipse, Tip = L.T("Овал (E)") },
                 new Btn { Cmd = Cmd.Tool, Tool = Tool.Marker, Tip = L.T("Маркер (M)") },
                 new Btn { Cmd = Cmd.Tool, Tool = Tool.Text, Tip = L.T("Текст (T)") },
+                new Btn { Cmd = Cmd.Tool, Tool = Tool.Step, Tip = L.T("Шаги 1, 2, 3 (N)") },
                 new Btn { Cmd = Cmd.Tool, Tool = Tool.Blur, Tip = L.T("Скрыть пикселями (B)") },
+                new Btn { Cmd = Cmd.Tool, Tool = Tool.SoftBlur, Tip = L.T("Размытие (U)") },
                 new Btn { Cmd = Cmd.Color, Tip = L.T("Цвет") },
                 new Btn { Cmd = Cmd.Undo, Tip = L.T("Отменить (Ctrl+Z)") },
             };
@@ -333,7 +340,11 @@ namespace Kadr
                 }
                 DrawSelectionFrame(g);
             }
-            else DrawHint(g);
+            else
+            {
+                if (!hoverWin.IsEmpty && mode == Mode.Idle) DrawHoverWin(g, clip);
+                DrawHint(g);
+            }
 
             if (BarsVisible)
             {
@@ -344,6 +355,126 @@ namespace Kadr
                 if (hover != null && mode == Mode.Idle) DrawTip(g, hover);
             }
             if (sizeTip != null) DrawSizeTip(g);
+            if (LoupeVisible) DrawLoupe(g);
+        }
+
+        // ---------------- window under the cursor ----------------
+
+        void DrawHoverWin(Graphics g, Rectangle clip)
+        {
+            var r = Rectangle.Intersect(hoverWin, clip);
+            if (r.Width > 0 && r.Height > 0)
+            {
+                var cm = g.CompositingMode;
+                g.CompositingMode = CompositingMode.SourceCopy;
+                g.DrawImage(shot, r, r.X, r.Y, r.Width, r.Height, GraphicsUnit.Pixel);
+                g.CompositingMode = cm;
+            }
+            var sm = g.SmoothingMode;
+            g.SmoothingMode = SmoothingMode.None;
+            int w = Math.Max(2, Sc(2));
+            using (var p = new Pen(Color.FromArgb(30, 136, 229), w) { Alignment = PenAlignment.Inset }) g.DrawRectangle(p, hoverWin);
+            g.SmoothingMode = sm;
+            string text = hoverWin.Width + " × " + hoverWin.Height;
+            var sz = g.MeasureString(text, uiFont);
+            var lr = HoverLabelRect();
+            lr.Width = (int)sz.Width + Sc(12);
+            using (var path = UI.Round(lr, Sc(5)))
+            using (var b = new SolidBrush(Color.FromArgb(225, 30, 136, 229))) g.FillPath(b, path);
+            g.DrawString(text, uiFont, Brushes.White, lr.X + Sc(6), lr.Y + (lr.Height - sz.Height) / 2);
+        }
+
+        Rectangle HoverLabelRect()
+        {
+            int h = Sc(24);
+            int y = hoverWin.Top - h - Sc(4);
+            if (y < MonitorOf(hoverWin).Top) y = hoverWin.Top + Sc(6);
+            return new Rectangle(hoverWin.Left + (y > hoverWin.Top ? Sc(6) : 0), y, Sc(140), h);
+        }
+
+        void InvalidateWin(Rectangle r)
+        {
+            if (r.IsEmpty) return;
+            var a = r;
+            a.Inflate(Sc(4), Sc(4));
+            var saved = hoverWin;
+            hoverWin = r;
+            a = Rectangle.Union(a, HoverLabelRect());
+            hoverWin = saved;
+            Invalidate(a);
+        }
+
+        // ---------------- magnifier ----------------
+
+        const int LoupeCells = 15;
+
+        bool LoupeVisible
+        {
+            get
+            {
+                if (mode == Mode.Selecting || mode == Mode.Resizing) return true;
+                return mode == Mode.Idle && !hasSel && ClientBounds.Contains(mouse);
+            }
+        }
+
+        Rectangle LoupeRect(Point m)
+        {
+            int z = Math.Max(6, Sc(8));
+            int size = LoupeCells * z, info = Sc(42), gap = Sc(22);
+            var mon = MonitorOf(new Rectangle(m, new Size(1, 1)));
+            int x = m.X + gap, y = m.Y + gap;
+            if (x + size > mon.Right) x = m.X - gap - size;
+            if (y + size + info > mon.Bottom) y = m.Y - gap - size - info;
+            return new Rectangle(x, y, size, size + info);
+        }
+
+        void InvalidateLoupe(Point m)
+        {
+            var r = LoupeRect(m);
+            r.Inflate(Sc(4), Sc(4));
+            Invalidate(r);
+        }
+
+        void DrawLoupe(Graphics g)
+        {
+            var R = LoupeRect(mouse);
+            int z = R.Width / LoupeCells;
+            var zoom = new Rectangle(R.X, R.Y, R.Width, R.Width);
+            using (var sb = new SolidBrush(Color.FromArgb(70, 0, 0, 0))) g.FillRectangle(sb, R.X + Sc(2), R.Y + Sc(2), R.Width, R.Height);
+            using (var bg = new SolidBrush(Color.FromArgb(32, 32, 34))) g.FillRectangle(bg, R);
+
+            var im = g.InterpolationMode; var pm = g.PixelOffsetMode; var sm = g.SmoothingMode;
+            g.InterpolationMode = InterpolationMode.NearestNeighbor;
+            g.PixelOffsetMode = PixelOffsetMode.Half;
+            g.SmoothingMode = SmoothingMode.None;
+            g.FillRectangle(Brushes.Black, zoom);
+            var src = new Rectangle(mouse.X - LoupeCells / 2, mouse.Y - LoupeCells / 2, LoupeCells, LoupeCells);
+            var part = Rectangle.Intersect(src, ClientBounds);
+            if (part.Width > 0 && part.Height > 0)
+            {
+                var dst = new Rectangle(zoom.X + (part.X - src.X) * z, zoom.Y + (part.Y - src.Y) * z, part.Width * z, part.Height * z);
+                g.DrawImage(shot, dst, part, GraphicsUnit.Pixel);
+            }
+            g.PixelOffsetMode = PixelOffsetMode.Default;
+            using (var gp = new Pen(Color.FromArgb(38, 255, 255, 255)))
+                for (int i = 1; i < LoupeCells; i++)
+                {
+                    g.DrawLine(gp, zoom.X + i * z, zoom.Y, zoom.X + i * z, zoom.Bottom - 1);
+                    g.DrawLine(gp, zoom.X, zoom.Y + i * z, zoom.Right - 1, zoom.Y + i * z);
+                }
+            var c = new Rectangle(zoom.X + (LoupeCells / 2) * z, zoom.Y + (LoupeCells / 2) * z, z, z);
+            g.DrawRectangle(Pens.Black, c.X - 1, c.Y - 1, c.Width + 1, c.Height + 1);
+            g.DrawRectangle(Pens.White, c.X, c.Y, c.Width - 1, c.Height - 1);
+            using (var bp = new Pen(Color.FromArgb(150, 255, 255, 255))) g.DrawRectangle(bp, R.X, R.Y, R.Width - 1, R.Height - 1);
+            g.InterpolationMode = im; g.PixelOffsetMode = pm; g.SmoothingMode = sm;
+
+            Color px = ClientBounds.Contains(mouse) ? shot.GetPixel(mouse.X, mouse.Y) : Color.Black;
+            int ty = zoom.Bottom + Sc(3);
+            g.DrawString((mouse.X + vs.X) + ", " + (mouse.Y + vs.Y), tipFont, Brushes.White, R.X + Sc(6), ty);
+            var sw = new Rectangle(R.X + Sc(7), ty + Sc(22), Sc(11), Sc(11));
+            using (var b = new SolidBrush(Color.FromArgb(255, px))) g.FillRectangle(b, sw);
+            g.DrawRectangle(Pens.Gray, sw);
+            g.DrawString("#" + px.R.ToString("X2") + px.G.ToString("X2") + px.B.ToString("X2"), tipFont, Brushes.White, sw.Right + Sc(5), ty + Sc(19));
         }
 
         void DrawSelectionFrame(Graphics g)
@@ -375,7 +506,7 @@ namespace Kadr
         void DrawHint(Graphics g)
         {
             var r = HintRect();
-            string text = L.T("Выдели область мышью или щёлкни, чтобы взять весь экран · Esc — отмена");
+            string text = L.T("Выдели область мышью или щёлкни по окну · Esc — отмена");
             var sz = g.MeasureString(text, uiFont);
             r = new Rectangle(r.X + (r.Width - (int)sz.Width - Sc(28)) / 2, r.Y, (int)sz.Width + Sc(28), r.Height);
             using (var path = UI.Round(r, Sc(10)))
@@ -426,6 +557,21 @@ namespace Kadr
                                 g.FillPolygon(brush, new[] { new PointF(cx + u + 1, cy - u - 1), new PointF(cx + u + 1 - 7 * k, cy - u - 1), new PointF(cx + u + 1, cy - u - 1 + 7 * k) });
                                 break;
                             case Tool.Rect: g.DrawRectangle(pen, cx - u, cy - u * 0.72f, 2 * u, 1.44f * u); break;
+                            case Tool.Ellipse: g.DrawEllipse(pen, cx - u, cy - u * 0.75f, 2 * u, 1.5f * u); break;
+                            case Tool.Step:
+                                g.FillEllipse(brush, cx - u, cy - u, 2 * u, 2 * u);
+                                using (var nf = new Font("Segoe UI", 10.5f * k, FontStyle.Bold, GraphicsUnit.Pixel))
+                                using (var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+                                    g.DrawString("1", nf, Brushes.White, new RectangleF(cx - u, cy - u + 0.5f * k, 2 * u, 2 * u), sf);
+                                break;
+                            case Tool.SoftBlur:
+                                using (var path = new GraphicsPath())
+                                {
+                                    path.AddEllipse(cx - u * 1.1f, cy - u * 1.1f, 2.2f * u, 2.2f * u);
+                                    using (var pg = new PathGradientBrush(path) { CenterColor = Ink, SurroundColors = new[] { Color.FromArgb(0, Ink) } })
+                                        g.FillPath(pg, path);
+                                }
+                                break;
                             case Tool.Blur:
                                 float c = u * 2 / 3f;
                                 for (int i = 0; i < 3; i++)
@@ -495,7 +641,7 @@ namespace Kadr
 
         void DrawSizeTip(Graphics g)
         {
-            float d = Math.Max(4, tool == Tool.Marker ? Math.Max(12, size * 5) : (tool == Tool.Text ? 12 + size * 3 : size));
+            float d = Math.Max(4, tool == Tool.Marker ? Math.Max(12, size * 5) : tool == Tool.Text ? 12 + size * 3 : tool == Tool.Step ? 2 * (11 + size * 2.5f) : size);
             using (var p = new Pen(Color.White, 1)) g.DrawEllipse(p, mouse.X - d / 2, mouse.Y - d / 2, d, d);
             using (var p = new Pen(Color.FromArgb(160, 0, 0, 0), 1)) g.DrawEllipse(p, mouse.X - d / 2 - 1, mouse.Y - d / 2 - 1, d + 2, d + 2);
             var sz = g.MeasureString(sizeTip, tipFont);
@@ -572,7 +718,16 @@ namespace Kadr
             dragged = false;
             selAtDown = sel;
 
-            if (!hasSel) { mode = Mode.Selecting; sel = new Rectangle(e.Location, Size.Empty); Refresh2(); return; }
+            if (!hasSel)
+            {
+                downWin = hoverWin;
+                InvalidateWin(hoverWin);
+                hoverWin = Rectangle.Empty;
+                mode = Mode.Selecting;
+                sel = new Rectangle(e.Location, Size.Empty);
+                Refresh2();
+                return;
+            }
 
             grip = HitGrip(e.Location);
             if (grip >= 0 && tool == Tool.None) { CommitText(); mode = Mode.Resizing; Refresh2(); return; }
@@ -585,7 +740,7 @@ namespace Kadr
             if (grip >= 0) { CommitText(); mode = Mode.Resizing; Refresh2(); return; }
             CommitText();
             if (tool == Tool.None && sel.Contains(e.Location)) { mode = Mode.Moving; Refresh2(); return; }
-            if (tool == Tool.None) { mode = Mode.Selecting; sel = new Rectangle(e.Location, Size.Empty); hasSel = false; Refresh2(); }
+            if (tool == Tool.None) { downWin = Rectangle.Empty; mode = Mode.Selecting; sel = new Rectangle(e.Location, Size.Empty); hasSel = false; Refresh2(); }
         }
 
         protected override void OnMouseMove(MouseEventArgs e)
@@ -593,6 +748,7 @@ namespace Kadr
             base.OnMouseMove(e);
             var old = mouse;
             mouse = e.Location;
+            if (LoupeVisible) { InvalidateLoupe(old); InvalidateLoupe(mouse); }
             if (Math.Abs(e.X - down.X) + Math.Abs(e.Y - down.Y) > 3) dragged = true;
             var b = ClientBounds;
             int dx = e.X - down.X, dy = e.Y - down.Y;
@@ -627,6 +783,11 @@ namespace Kadr
                     return;
             }
 
+            if (!hasSel)
+            {
+                var hw = wins.FirstOrDefault(r => r.Contains(e.Location));
+                if (hw != hoverWin) { InvalidateWin(hoverWin); hoverWin = hw; InvalidateWin(hoverWin); }
+            }
             var hb = HitButton(e.Location);
             if (hb != hover) { hover = hb; Refresh2(); }
             if (!hasSel && HintRect().IntersectsWith(new Rectangle(old.X - 400, old.Y - 400, 800, 800))) Invalidate(HintRect());
@@ -638,12 +799,13 @@ namespace Kadr
         {
             base.OnMouseUp(e);
             if (e.Button != MouseButtons.Left) return;
+            if (LoupeVisible) InvalidateLoupe(mouse);
             switch (mode)
             {
                 case Mode.Selecting:
                     if (!dragged || sel.Width < 3 || sel.Height < 3)
                     {
-                        sel = MonitorOf(new Rectangle(e.Location, new Size(1, 1)));
+                        sel = !downWin.IsEmpty ? downWin : MonitorOf(new Rectangle(e.Location, new Size(1, 1)));
                         hasSel = true;
                     }
                     break;
@@ -719,6 +881,9 @@ namespace Kadr
                     break;
                 case Tool.Line: case Tool.Arrow: cur = new LineShape { A = p, B = p, Arrow = tool == Tool.Arrow }; break;
                 case Tool.Rect: cur = new RectShape { A = p, B = p }; break;
+                case Tool.Ellipse: cur = new RectShape { A = p, B = p, Ellipse = true }; break;
+                case Tool.Step: cur = new StepShape { Center = p, Number = shapes.OfType<StepShape>().Select(x => x.Number).DefaultIfEmpty(0).Max() + 1 }; break;
+                case Tool.SoftBlur: cur = new BlurShape { A = p, B = p, Smooth = true }; break;
                 case Tool.Blur: cur = new BlurShape { A = p, B = p }; break;
             }
             cur.Color = color;
@@ -760,6 +925,8 @@ namespace Kadr
             if (rc != null) rc.B = shift ? Square(rc.A, p) : p;
             var bl = cur as BlurShape;
             if (bl != null) bl.B = p;
+            var sp = cur as StepShape;
+            if (sp != null) sp.Center = p;
             curBounds = cur.Bounds;
             Invalidate(Rectangle.Union(before, curBounds));
         }
@@ -962,6 +1129,9 @@ namespace Kadr
                     case Keys.M: t = Tool.Marker; break;
                     case Keys.T: t = Tool.Text; break;
                     case Keys.B: t = Tool.Blur; break;
+                    case Keys.E: t = Tool.Ellipse; break;
+                    case Keys.N: t = Tool.Step; break;
+                    case Keys.U: t = Tool.SoftBlur; break;
                     default: hit = false; break;
                 }
                 if (hit) { tool = tool == t ? Tool.None : t; Refresh2(); UpdateCursor(mouse); return true; }
@@ -996,9 +1166,22 @@ namespace Kadr
             mk.Points.Add(new Point(640, 470)); mk.Points.Add(new Point(900, 470));
             shapes.Add(mk);
             shapes.Add(new BlurShape { A = new Point(880, 200), B = new Point(1040, 280), Size = 4 });
+            shapes.Add(new BlurShape { A = new Point(330, 282), B = new Point(600, 302), Size = 4, Smooth = true });
+            shapes.Add(new RectShape { A = new Point(860, 330), B = new Point(1040, 420), Color = Colors[5], Size = 3, Ellipse = true });
+            shapes.Add(new StepShape { Center = new Point(330, 200), Number = 1, Color = Colors[0], Size = 4 });
+            shapes.Add(new StepShape { Center = new Point(600, 300), Number = 2, Color = Colors[0], Size = 4 });
+            shapes.Add(new StepShape { Center = new Point(860, 470), Number = 3, Color = Colors[2], Size = 4 });
             shapes.Add(new TextShape { Pos = new Point(640, 500), Text = "Привет, Кадр!", Color = Colors[0], Size = 4, Editing = true });
             Layout2();
             hover = btns.First(b => b.Cmd == Cmd.Upload);
         }
+
+        public void TestHover(Point m)
+        {
+            mouse = m;
+            hoverWin = wins.FirstOrDefault(r => r.Contains(m));
+        }
+
+        public int WindowCount { get { return wins.Count; } }
     }
 }

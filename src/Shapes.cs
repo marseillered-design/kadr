@@ -8,7 +8,7 @@ using System.Linq;
 
 namespace Kadr
 {
-    enum Tool { None, Pen, Line, Arrow, Rect, Marker, Text, Blur }
+    enum Tool { None, Pen, Line, Arrow, Rect, Marker, Text, Blur, Ellipse, Step, SoftBlur }
 
     abstract class Shape
     {
@@ -107,13 +107,17 @@ namespace Kadr
     class RectShape : Shape
     {
         public Point A, B;
+        public bool Ellipse;
 
         public override void Draw(Graphics g, Bitmap baseImage)
         {
             var r = Norm(A, B);
             if (r.Width < 1 || r.Height < 1) return;
             using (var pen = new Pen(Color, Size) { LineJoin = LineJoin.Miter, Alignment = PenAlignment.Center })
-                g.DrawRectangle(pen, r);
+            {
+                if (Ellipse) g.DrawEllipse(pen, r);
+                else g.DrawRectangle(pen, r);
+            }
         }
 
         public override Rectangle Bounds
@@ -131,6 +135,8 @@ namespace Kadr
     class BlurShape : Shape
     {
         public Point A, B;
+        /// <summary>true = soft blur, false = big pixels.</summary>
+        public bool Smooth;
         Bitmap cache;
         Rectangle cacheRect;
 
@@ -141,6 +147,12 @@ namespace Kadr
             if (cache == null || cacheRect != r)
             {
                 if (cache != null) cache.Dispose();
+                if (Smooth)
+                {
+                    cache = SoftBlur(baseImage, r, Math.Max(4, Size * 2));
+                    cacheRect = r;
+                    goto draw;
+                }
                 int block = Math.Max(8, Size * 3);
                 int sw = Math.Max(1, (r.Width + block - 1) / block), sh = Math.Max(1, (r.Height + block - 1) / block);
                 using (var small = new Bitmap(sw, sh, PixelFormat.Format32bppArgb))
@@ -161,11 +173,37 @@ namespace Kadr
                 }
                 cacheRect = r;
             }
+            draw:
             var im = g.InterpolationMode; var pm = g.PixelOffsetMode;
             g.InterpolationMode = InterpolationMode.NearestNeighbor;
             g.PixelOffsetMode = PixelOffsetMode.Half;
             g.DrawImage(cache, r, new Rectangle(0, 0, r.Width, r.Height), GraphicsUnit.Pixel);
             g.InterpolationMode = im; g.PixelOffsetMode = pm;
+        }
+
+        /// <summary>Shrinks the area by the factor and scales it back smoothly; mirrored edges keep the border from going dark.</summary>
+        static Bitmap SoftBlur(Bitmap src, Rectangle r, int factor)
+        {
+            int sw = Math.Max(1, r.Width / factor), sh = Math.Max(1, r.Height / factor);
+            var result = new Bitmap(r.Width, r.Height, PixelFormat.Format32bppPArgb);
+            using (var small = new Bitmap(sw, sh, PixelFormat.Format32bppArgb))
+            using (var ia = new ImageAttributes())
+            {
+                ia.SetWrapMode(WrapMode.TileFlipXY);
+                using (var g2 = Graphics.FromImage(small))
+                {
+                    g2.InterpolationMode = InterpolationMode.HighQualityBilinear;
+                    g2.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                    g2.DrawImage(src, new Rectangle(0, 0, sw, sh), r.X, r.Y, r.Width, r.Height, GraphicsUnit.Pixel, ia);
+                }
+                using (var g3 = Graphics.FromImage(result))
+                {
+                    g3.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                    g3.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                    g3.DrawImage(small, new Rectangle(0, 0, r.Width, r.Height), 0, 0, sw, sh, GraphicsUnit.Pixel, ia);
+                }
+            }
+            return result;
         }
 
         public override Rectangle Bounds
@@ -176,6 +214,36 @@ namespace Kadr
         public override bool Trivial
         {
             get { var r = Norm(A, B); return r.Width < 4 || r.Height < 4; }
+        }
+    }
+
+    /// <summary>A numbered circle for step-by-step instructions.</summary>
+    class StepShape : Shape
+    {
+        public Point Center;
+        public int Number;
+
+        float R { get { return 11 + Size * 2.5f; } }
+
+        public override void Draw(Graphics g, Bitmap baseImage)
+        {
+            float r = R;
+            var rect = new RectangleF(Center.X - r, Center.Y - r, 2 * r, 2 * r);
+            bool light = Color.R * 0.299 + Color.G * 0.587 + Color.B * 0.114 > 170;
+            using (var b = new SolidBrush(Color)) g.FillEllipse(b, rect);
+            using (var p = new Pen(light ? Color.FromArgb(70, 70, 70) : Color.White, Math.Max(1.5f, r / 9))) g.DrawEllipse(p, rect);
+            var hint = g.TextRenderingHint;
+            g.TextRenderingHint = TextRenderingHint.AntiAlias;
+            using (var f = new Font("Segoe UI", r * (Number > 9 ? 0.82f : 1.02f), FontStyle.Bold, GraphicsUnit.Pixel))
+            using (var tb = new SolidBrush(light ? Color.FromArgb(25, 25, 25) : Color.White))
+            using (var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+                g.DrawString(Number.ToString(), f, tb, new RectangleF(rect.X, rect.Y + r * 0.04f, rect.Width, rect.Height), sf);
+            g.TextRenderingHint = hint;
+        }
+
+        public override Rectangle Bounds
+        {
+            get { int r = (int)R + 4; return new Rectangle(Center.X - r, Center.Y - r, 2 * r, 2 * r); }
         }
     }
 

@@ -373,7 +373,7 @@ namespace Kadr
                 b.Offset(-vs.X, -vs.Y);
                 init = b;
             }
-            capture = new CaptureForm(S, bmp, vs, init, S.Destinations());
+            capture = new CaptureForm(S, bmp, vs, init, S.Destinations(), null, WindowList.Get(vs));
             capture.FormClosed += OnCaptureClosed;
             capture.Show();
             SelfTest(capture, vs);
@@ -395,7 +395,7 @@ namespace Kadr
                         f.DrawToBitmap(b, new Rectangle(0, 0, f.Width, f.Height));
                         using (var small = Imaging.Fit(b, 1600, 1600)) small.Save(Path.Combine(dir, "overlay-live.png"), ImageFormat.Png);
                     }
-                    var info = "virtual=" + vs + " form=" + f.Bounds + " active=" + (Form.ActiveForm == f) +
+                    var info = "virtual=" + vs + " form=" + f.Bounds + " active=" + (Form.ActiveForm == f) + " windows=" + f.WindowCount +
                                " screens=" + string.Join(";", Screen.AllScreens.Select(sc => sc.Bounds + "@" + Native.ScaleAt(sc.Bounds.Location)));
                     File.WriteAllText(Path.Combine(dir, "overlay-live.txt"), info);
                 }

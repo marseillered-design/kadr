@@ -214,6 +214,10 @@ namespace Kadr
             A("Адрес прокси не похож на настоящий. Пример: 192.168.1.10:8080", "Адрес прокси не похож на настоящий. Пример: 192.168.1.10:8080", "Адреса проксі не схожа на справжню. Приклад: 192.168.1.10:8080", "That proxy address doesn’t look right. Example: 192.168.1.10:8080", "Die Proxy-Adresse sieht nicht richtig aus. Beispiel: 192.168.1.10:8080", "L’adresse du proxy semble incorrecte. Exemple : 192.168.1.10:8080", "La dirección del proxy no parece válida. Ejemplo: 192.168.1.10:8080", "L’indirizzo del proxy non sembra valido. Esempio: 192.168.1.10:8080");
             A("Печать (Ctrl+P)", "Печать (Ctrl+P)", "Друк (Ctrl+P)", "Print (Ctrl+P)", "Drucken (Ctrl+P)", "Imprimer (Ctrl+P)", "Imprimir (Ctrl+P)", "Stampa (Ctrl+P)");
             A("Не удалось напечатать", "Не удалось напечатать", "Не вдалося надрукувати", "Could not print", "Drucken fehlgeschlagen", "Impression impossible", "No se pudo imprimir", "Impossibile stampare");
+            A("Овал (E)", "Овал (E)", "Овал (E)", "Ellipse (E)", "Ellipse (E)", "Ellipse (E)", "Elipse (E)", "Ellisse (E)");
+            A("Шаги 1, 2, 3 (N)", "Шаги 1, 2, 3 (N)", "Кроки 1, 2, 3 (N)", "Steps 1, 2, 3 (N)", "Schritte 1, 2, 3 (N)", "Étapes 1, 2, 3 (N)", "Pasos 1, 2, 3 (N)", "Passi 1, 2, 3 (N)");
+            A("Размытие (U)", "Размытие (U)", "Розмиття (U)", "Blur (U)", "Weichzeichnen (U)", "Flouter (U)", "Desenfocar (U)", "Sfoca (U)");
+            A("Выдели область мышью или щёлкни по окну · Esc — отмена", "Выдели область мышью или щёлкни по окну · Esc — отмена", "Виділи область мишею або клацни по вікну · Esc — скасувати", "Drag to select an area or click a window · Esc to cancel", "Bereich aufziehen oder auf ein Fenster klicken · Esc zum Abbrechen", "Sélectionnez une zone ou cliquez sur une fenêtre · Échap pour annuler", "Arrastra para elegir un área o haz clic en una ventana · Esc para cancelar", "Trascina per selezionare un’area o fai clic su una finestra · Esc per annullare");
         }
     }
 }

@@ -95,6 +95,16 @@ namespace Kadr
                     if (scale == 1f) using (var o = form.Render()) o.Save(Path.Combine(outDir, "output.png"), ImageFormat.Png);
                 }
             }
+            var fakeWins = new System.Collections.Generic.List<Rectangle> { new Rectangle(500, 300, 520, 330), new Rectangle(120, 80, 900, 600) };
+            using (var form = new CaptureForm(s, FakeScreen(vs.Width, vs.Height), vs, null, s.Destinations(), 1f, fakeWins))
+            {
+                form.TestHover(new Point(700, 420));
+                using (var b = new Bitmap(vs.Width, vs.Height))
+                {
+                    using (var g = Graphics.FromImage(b)) form.PaintTo(g, vs);
+                    b.Save(Path.Combine(outDir, "overlay-hover.png"), ImageFormat.Png);
+                }
+            }
             using (var ic = AppIcon.Draw(256)) ic.Save(Path.Combine(outDir, "icon-256.png"), ImageFormat.Png);
             using (var ic = AppIcon.Draw(16)) ic.Save(Path.Combine(outDir, "icon-16.png"), ImageFormat.Png);
         }
