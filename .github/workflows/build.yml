@@ -61,7 +61,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: macos-14, arch: AppleSilicon }
+          - { os: macos-15, arch: AppleSilicon }
           - { os: macos-15-intel, arch: Intel }
     runs-on: ${{ matrix.os }}
     defaults: { run: { working-directory: qt } }
