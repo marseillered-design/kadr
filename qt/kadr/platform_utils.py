@@ -58,9 +58,14 @@ def reveal(path: str):
 
 # ---------------- macOS window level / activation ----------------
 
+def _cocoa() -> bool:
+    """True only when Qt really draws through macOS windows (not the offscreen test platform)."""
+    return MAC and QGuiApplication.platformName() == "cocoa"
+
+
 def raise_overlay(widget):
     """Put the capture window above the menu bar and Dock on macOS, on every Space."""
-    if not MAC:
+    if not _cocoa():
         return
     try:
         import objc
@@ -76,7 +81,7 @@ def raise_overlay(widget):
 
 def activate_app():
     """A menu-bar app must bring itself forward explicitly on macOS."""
-    if not MAC:
+    if not _cocoa():
         return
     try:
         from AppKit import NSApplication
