@@ -18,7 +18,11 @@ import requests
 
 from . import __version__, platform_utils
 
-REPO = "marseillered-design/kadr"
+# the repository that built this copy (stamped by tools/stamp_version.py), so forks update from themselves
+try:
+    from . import __repo__ as REPO
+except ImportError:
+    REPO = "marseillered-design/kadr"
 API = f"https://api.github.com/repos/{REPO}/releases/latest"
 DOWNLOAD_PREFIX = f"https://github.com/{REPO}/releases/download/"
 

@@ -9,7 +9,8 @@ $src = @(Get-ChildItem "$root\src\*.cs" | ForEach-Object { $_.FullName })
 # Version for the updater: the release tag on GitHub (VERSION=v1.2.0), "0.0.0-dev" for builds made anywhere else
 $ver = if ($env:VERSION) { $env:VERSION.TrimStart("v") } else { "0.0.0-dev" }
 $verFile = Join-Path $env:TEMP "kadr-version.cs"
-"[assembly: System.Reflection.AssemblyInformationalVersion(`"$ver`")]" | Set-Content $verFile -Encoding UTF8
+$repo = if ($env:GITHUB_REPOSITORY) { $env:GITHUB_REPOSITORY } else { "marseillered-design/kadr" }   # where updates come from
+"[assembly: System.Reflection.AssemblyInformationalVersion(`"$ver`")]", "[assembly: System.Reflection.AssemblyMetadata(`"Repo`", `"$repo`")]" | Set-Content $verFile -Encoding UTF8
 $src += $verFile
 $ico = "$root\icons\kadr.ico"
 $common = @("/nologo", "/codepage:65001", "/optimize+", "/platform:anycpu", "/win32manifest:$root\app.manifest", "/resource:$ico,Kadr.icon.ico") + $refs

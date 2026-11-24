@@ -29,7 +29,19 @@ namespace Kadr
     /// </summary>
     static class Updater
     {
-        public const string Repo = "marseillered-design/kadr";
+        /// <summary>
+        /// The GitHub repository this build came from (set by build.ps1 from GITHUB_REPOSITORY), so a fork's
+        /// builds update from the fork and never overwrite its changes with the original's releases.
+        /// </summary>
+        public static string Repo
+        {
+            get
+            {
+                foreach (AssemblyMetadataAttribute m in Assembly.GetExecutingAssembly().GetCustomAttributes(typeof(AssemblyMetadataAttribute), false))
+                    if (m.Key == "Repo" && !string.IsNullOrEmpty(m.Value)) return m.Value;
+                return "marseillered-design/kadr";
+            }
+        }
         static readonly HttpClient Http = CreateClient();
 
         static HttpClient CreateClient()
