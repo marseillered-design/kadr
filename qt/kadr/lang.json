@@ -1915,5 +1915,23 @@
 "Windows a besoin du Media Feature Pack : Paramètres → Applications → Fonctionnalités facultatives.",
 "Windows necesita el Media Feature Pack: Configuración → Aplicaciones → Características opcionales.",
 "Windows richiede il Media Feature Pack: Impostazioni → App → Funzionalità facoltative."
+],
+"Кадр — идёт запись": [
+"Кадр — идёт запись",
+"Кадр — триває запис",
+"Kadr — recording",
+"Kadr — Aufnahme läuft",
+"Kadr — enregistrement",
+"Kadr — grabando",
+"Kadr — registrazione in corso"
+],
+"Остановить и сохранить": [
+"Остановить и сохранить",
+"Зупинити й зберегти",
+"Stop and save",
+"Beenden und speichern",
+"Arrêter et enregistrer",
+"Detener y guardar",
+"Ferma e salva"
 ]
 }

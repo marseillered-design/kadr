@@ -189,7 +189,7 @@ namespace Kadr
             if (h == hot) return;
             hot = h;
             Cursor = h >= 0 ? Cursors.Hand : Cursors.SizeAll;
-            string tip = h == 0 ? (Paused ? L.T("Продолжить") : L.T("Пауза")) : h == 1 ? L.F("Остановить и сохранить ({0})", StopKey) : h == 2 ? L.T("Остановить и удалить") : null;
+            string tip = h == 0 ? (Paused ? L.T("Продолжить") : L.T("Пауза")) : h == 1 ? (StopKey.Length > 0 ? L.F("Остановить и сохранить ({0})", StopKey) : L.T("Остановить и сохранить")) : h == 2 ? L.T("Остановить и удалить") : null;
             if (tip == null) tips.Hide(this); else tips.Show(tip, this, e.X, Height + S(4), 2500);
             Invalidate();
         }

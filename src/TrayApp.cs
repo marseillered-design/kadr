@@ -426,10 +426,11 @@ namespace Kadr
 
         void ApplyHook()
         {
-            hook.Hotkey = S.Hotkey;
-            hook.VideoHotkey = S.VideoHotkey;
-            if (S.HookPrintScreen) hook.Start(); else hook.Stop();
-            videoItem.ShortcutKeyDisplayString = S.HookPrintScreen ? Settings.KeyText(S.VideoHotkey) : "";
+            // the two hotkeys are switched on and off separately; 0 = that one is off
+            hook.Hotkey = S.HookPrintScreen ? S.Hotkey : 0;
+            hook.VideoHotkey = S.VideoHotkeyOn ? S.VideoHotkey : 0;
+            if (S.HookPrintScreen || S.VideoHotkeyOn) hook.Start(); else hook.Stop();
+            videoItem.ShortcutKeyDisplayString = S.VideoHotkeyOn ? Settings.KeyText(S.VideoHotkey) : "";
             string key = Settings.KeyText(S.Hotkey);
             bool plainPrtScn = S.Hotkey == (int)Keys.PrintScreen;
             shotItem.ShortcutKeyDisplayString = S.HookPrintScreen ? key : "";
@@ -593,12 +594,12 @@ namespace Kadr
                 r.Failed += () => { try { ui.BeginInvoke((Action)(() => { if (rec == r) StopRecording(false); })); } catch { } };
                 recFrame = new RecordFrame(r.Area);
                 recFrame.Show();
-                recPanel = new RecordPanel(r.Area) { Elapsed = () => r.Elapsed, StopKey = Settings.KeyText(S.VideoHotkey) };
+                recPanel = new RecordPanel(r.Area) { Elapsed = () => r.Elapsed, StopKey = S.VideoHotkeyOn ? Settings.KeyText(S.VideoHotkey) : "" };
                 recPanel.PauseClicked += () => { r.SetPaused(!r.Paused); recPanel.Paused = r.Paused; recFrame.Paused = r.Paused; };
                 recPanel.StopClicked += () => StopRecording(false);
                 recPanel.DiscardClicked += () => StopRecording(true);
                 recPanel.Show();
-                tray.Text = L.F("Кадр — идёт запись ({0} — стоп)", Settings.KeyText(S.VideoHotkey));
+                tray.Text = S.VideoHotkeyOn ? L.F("Кадр — идёт запись ({0} — стоп)", Settings.KeyText(S.VideoHotkey)) : L.T("Кадр — идёт запись");
                 string missing = (sysAudio && !r.SysAudioOn ? L.T("звук компьютера") : null) ?? (mic && !r.MicOn ? L.T("микрофон") : null);
                 if (missing != null) Toast.Info(null, L.T("Запись идёт без части звука"), L.F("Не нашлось устройство: {0}.", missing), null, 8);
             };

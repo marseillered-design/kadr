@@ -129,6 +129,7 @@ namespace Kadr
         readonly TextBox proxyAddr, proxyUser, proxyPass;
         readonly CheckBox notify, autoUpdate;
         readonly HotkeyBox videoKey;
+        readonly CheckBox videoKeyOn;
         readonly CheckBox vSys, vMic;
         readonly ComboBox vFps;
         readonly TextBox vFolder;
@@ -218,7 +219,10 @@ namespace Kadr
             var vg = Lay.Table(2);
             videoKey = new HotkeyBox(s.VideoHotkey);
             videoKey.Margin = new Padding(0, UI.S(3), 0, UI.S(3));
-            Lay.Row(vg, Lay.Label(L.T("Начать и остановить:")), videoKey);
+            videoKeyOn = Lay.Check(L.T("Начать и остановить:"), s.VideoHotkeyOn);
+            videoKeyOn.CheckedChanged += (o, e) => videoKey.Enabled = videoKeyOn.Checked;
+            videoKey.Enabled = videoKeyOn.Checked;
+            Lay.Row(vg, videoKeyOn, videoKey);
             vSys = Lay.Check(L.T("Звук компьютера"), s.VideoSysAudio);
             vMic = Lay.Check(L.T("Микрофон"), s.VideoMic);
             Lay.Row(vg, Lay.Label(L.T("Звук:")), Lay.Flow(vSys, vMic));
@@ -242,8 +246,6 @@ namespace Kadr
             hotkey = new HotkeyBox(s.Hotkey);
             hookKey.CheckedChanged += (o, e) => hotkey.Enabled = hookKey.Checked;
             hotkey.Enabled = hookKey.Checked;
-            hookKey.CheckedChanged += (o, e) => videoKey.Enabled = hookKey.Checked;
-            videoKey.Enabled = hookKey.Checked;
             autostart = Lay.Check(L.T("Запускать Кадр вместе с Windows"), Shell.Autostart);
             sendTo = Lay.Check(L.T("Пункт «Кадр (загрузить)» в меню «Отправить» для картинок"), Shell.SendTo);
             Lay.Row(gen, Lay.Flow(hookKey, hotkey));
@@ -394,9 +396,10 @@ namespace Kadr
                 hotkey.Focus();
                 return;
             }
-            if (hookKey.Checked && (!Settings.HotkeyAllowed(videoKey.Value) || videoKey.Value == hotkey.Value))
+            bool same = hookKey.Checked && videoKey.Value == hotkey.Value;
+            if (videoKeyOn.Checked && (!Settings.HotkeyAllowed(videoKey.Value) || same))
             {
-                MessageBox.Show(this, videoKey.Value == hotkey.Value
+                MessageBox.Show(this, same
                     ? L.T("Для снимка и для видео нужны разные сочетания клавиш.")
                     : L.F("Сочетание «{0}» мешало бы печатать. Добавь Ctrl, Alt или Shift (например Shift+PageUp) или возьми F1–F12, PrtScn, Pause, Insert, PageUp.", Settings.KeyText(videoKey.Value)),
                     L.T("Кадр"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -405,6 +408,7 @@ namespace Kadr
             }
             S.Hotkey = hotkey.Value;
             S.VideoHotkey = videoKey.Value;
+            S.VideoHotkeyOn = videoKeyOn.Checked;
             S.VideoSysAudio = vSys.Checked;
             S.VideoMic = vMic.Checked;
             S.VideoFps = int.Parse((string)vFps.SelectedItem ?? "30");
