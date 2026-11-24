@@ -38,6 +38,7 @@ Get the installer for your system from **Releases**:
 - Screenshot format for saving and uploading: PNG, or JPG with a quality setting.
 - Upload proxy: as in the system, none, or your own address with login and password (the password is stored encrypted).
 - Success notices can be turned off; errors are always shown.
+- **Updates itself:** Kadr checks GitHub Releases a minute after start and every 6 hours; a new version is downloaded, checked (SHA-256) and installed when Kadr is idle, then Kadr restarts. Turn it off in Settings; “Check for updates” is in the tray menu. (Linux .deb/.rpm ask for your password, so they install when you click the notice.)
 - Windows: Kadr can add “Kadr (upload)” to the **Send to** menu — right-click a picture → Send to → Kadr.
 
 ## Where uploads go

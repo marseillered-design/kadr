@@ -13,7 +13,7 @@ from PySide6.QtGui import (QAction, QColor, QGuiApplication, QIcon, QImage, QLin
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtWidgets import QApplication, QFileDialog, QMenu, QSystemTrayIcon
 
-from . import capture, i18n, platform_utils, settings as st, toast, uploader
+from . import capture, i18n, platform_utils, settings as st, toast, updater, uploader
 from .dialogs import HistoryDialog, SettingsDialog
 from .hotkey import GlobalHotkey
 from .i18n import T, F
@@ -151,7 +151,9 @@ def encode(img: QImage, jpeg: bool, quality: int) -> bytes:
 class KadrApp(QObject):
     uploaded = Signal(object)
 
-    def __init__(self, qapp: QApplication, quiet: bool):
+    update_event = Signal(object)
+
+    def __init__(self, qapp: QApplication, quiet: bool, updated: bool = False):
         super().__init__()
         self.qapp = qapp
         self.S = st.Settings.load()
@@ -159,6 +161,10 @@ class KadrApp(QObject):
         self.settings_dlg = None
         self.history_dlg = None
         self.uploaded.connect(self._uploaded)
+        self.update_event.connect(self._update_event)
+        self.active_uploads = 0
+        self.updating = False
+        updater.cleanup()
         self.hotkey = GlobalHotkey()
         self.hotkey.activated.connect(lambda: self.capture(False))
 
@@ -181,6 +187,15 @@ class KadrApp(QObject):
 
         if platform_utils.MAC:
             platform_utils.screen_capture_allowed(ask=True)   # asks once, on the first start
+
+        if updated:
+            page = f"https://github.com/{updater.REPO}/releases/tag/v{updater.version()}"
+            toast.info(None, F("Кадр обновлён до {0}", updater.version()), T("Щёлкни, чтобы посмотреть, что нового."),
+                       lambda: platform_utils.open_url(page), 10)
+        # look for a new version a minute after start, then every 6 hours
+        self.update_timer = QTimer(self)
+        self.update_timer.timeout.connect(self._update_tick)
+        self.update_timer.start(60 * 1000)
 
     def key_text(self):
         from PySide6.QtGui import QKeySequence
@@ -205,6 +220,9 @@ class KadrApp(QObject):
         m.addSeparator()
         m.addAction(T("История загрузок"), self.show_history)
         m.addAction(T("Настройки"), self.show_settings)
+        upd = m.addAction(T("Проверить обновления"), lambda: self.check_updates(True))
+        upd.setShortcut("")
+        upd.setText(T("Проверить обновления") + f"   ({'dev' if updater.is_dev() else updater.version()})")
         m.addSeparator()
         m.addAction(T("Выход"), self.quit)
         self._menu = m
@@ -358,6 +376,7 @@ class KadrApp(QObject):
     def upload(self, data: bytes, name: str, dest: str, thumb: QImage | None, is_shot: bool):
         s = self.S
         notice = toast.show(thumb, F("Загружаю в {0}…", dest), name) if s.ShowNotifications else None
+        self.active_uploads += 1
 
         def work():
             try:
@@ -370,6 +389,7 @@ class KadrApp(QObject):
 
     def _uploaded(self, payload):
         notice, dest, name, data, thumb, is_shot, r, err = payload
+        self.active_uploads = max(0, self.active_uploads - 1)
         s = self.S
         if err is None:
             if s.CopyLink:
@@ -465,6 +485,98 @@ class KadrApp(QObject):
         d.raise_()
         d.activateWindow()
 
+    # ---- updates ----
+    def busy(self) -> bool:
+        return self.session is not None or self.settings_dlg is not None or self.active_uploads > 0
+
+    def _update_tick(self):
+        self.update_timer.setInterval(6 * 60 * 60 * 1000)
+        self.check_updates(False)
+
+    def check_updates(self, manual: bool):
+        """Asks GitHub for the latest release on a background thread; the answer comes back as update_event."""
+        if self.updating:
+            return
+        if not manual and (not self.S.AutoUpdate or updater.is_dev()):
+            return
+        if updater.is_dev():
+            toast.info(None, T("Проверить обновления"), T("Это сборка для разработки — обновления выключены."))
+            return
+        kind = updater.install_kind()
+        if kind is None:
+            if manual:
+                toast.error(T("Не удалось обновить"), f"https://github.com/{updater.REPO}/releases")
+            return
+        self.updating = True
+
+        def work():
+            try:
+                info = updater.latest(kind)
+                if updater.compare(info["version"], updater.version()) <= 0:
+                    self.update_event.emit(("current", manual, kind, info, None))
+                    return
+                if updater.needs_password(kind):
+                    self.update_event.emit(("ask", manual, kind, info, None))
+                    return
+                path = updater.download(info)
+                self.update_event.emit(("ready", manual, kind, info, path))
+            except Exception as e:
+                self.update_event.emit(("error", manual, kind, None, e))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _update_event(self, ev):
+        what, manual, kind, info, extra = ev
+        if what == "current":
+            self.updating = False
+            if manual:
+                toast.info(None, T("Проверить обновления"), F("У тебя последняя версия ({0}).", updater.version()))
+        elif what == "error":
+            self.updating = False
+            if manual:
+                toast.error(T("Не удалось проверить обновления"), str(extra))
+        elif what == "ask":
+            # .deb / .rpm need the system password: only when the user clicks
+            self.updating = False
+            t = toast.show(None, F("Есть обновление {0}", info["version"]), T("Щёлкни, чтобы установить (система спросит пароль)."))
+            t.done(F("Есть обновление {0}", info["version"]), T("Щёлкни, чтобы установить (система спросит пароль)."),
+                   lambda: self._install_with_password(kind, info), False, 30)
+        elif what == "ready":
+            self._install_when_idle(kind, info, extra, manual)
+        elif what == "installed":
+            QTimer.singleShot(500, self.quit)
+        elif what == "failed":
+            self.updating = False
+            toast.error(T("Не удалось обновить"), str(extra))
+
+    def _install_when_idle(self, kind, info, path, manual):
+        if self.busy():                      # never interrupt a capture, an upload or the settings
+            QTimer.singleShot(30 * 1000, lambda: self._install_when_idle(kind, info, path, manual))
+            return
+        if self.S.ShowNotifications or manual:
+            toast.info(None, F("Обновляю Кадр до {0}…", info["version"]), "", None, 5)
+        QApplication.processEvents()
+        try:
+            updater.install(kind, path)
+        except Exception as e:
+            self.updating = False
+            toast.error(T("Не удалось обновить"), str(e))
+            return
+        QTimer.singleShot(1200, self.quit)
+
+    def _install_with_password(self, kind, info):
+        self.updating = True
+
+        def work():
+            try:
+                path = updater.download(info)
+                updater.install(kind, path)          # pkexec shows the system's password dialog
+                self.update_event.emit(("installed", False, kind, info, None))
+            except Exception as e:
+                self.update_event.emit(("failed", False, kind, info, e))
+
+        threading.Thread(target=work, daemon=True).start()
+
     def quit(self):
         self.hotkey.unregister()
         self.tray.hide()
@@ -556,7 +668,7 @@ def main(argv=None):
     file_filter = _FileOpenFilter(None)
     qapp.installEventFilter(file_filter)
 
-    kadr = KadrApp(qapp, quiet="--tray" in argv)
+    kadr = KadrApp(qapp, quiet="--tray" in argv, updated="--updated" in argv)
     kadr._qt_tr = install_qt_translation(qapp)
     QTimer.singleShot(4000, trim_memory)
     file_filter.app = kadr

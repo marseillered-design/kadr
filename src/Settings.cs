@@ -88,6 +88,8 @@ namespace Kadr
         public int JpegQuality { get; set; }
         /// <summary>Success notices (uploaded, saved, started). Errors are always shown.</summary>
         public bool ShowNotifications { get; set; }
+        /// <summary>Install new releases from GitHub by itself.</summary>
+        public bool AutoUpdate { get; set; }
         /// <summary>"system" (as in Windows), "none" or "custom".</summary>
         public string ProxyMode { get; set; }
         public string ProxyAddress { get; set; }
@@ -118,6 +120,7 @@ namespace Kadr
             ImageFormat = "png";
             JpegQuality = 90;
             ShowNotifications = true;
+            AutoUpdate = true;
             ProxyMode = "system";
             ProxyAddress = "";
             ProxyUser = "";
@@ -158,6 +161,7 @@ namespace Kadr
                     if (s.JpegQuality < 50 || s.JpegQuality > 100) s.JpegQuality = 90;
                     if (s.ProxyMode != "none" && s.ProxyMode != "custom") s.ProxyMode = "system";
                     if (!raw.Contains("\"ShowNotifications\"")) s.ShowNotifications = true;
+                    if (!raw.Contains("\"AutoUpdate\"")) s.AutoUpdate = true;
                     Uploader.Configure(s);
                     return s;
                 }

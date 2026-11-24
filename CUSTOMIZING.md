@@ -59,6 +59,10 @@ Checks you can run after a change:
 
 Fork the repository on GitHub. Every push builds everything on GitHub’s servers (`.github/workflows/build.yml`); pushing a tag such as `v1.2.0` publishes the Windows installer, the macOS `.dmg` files and the Linux `.deb`, `.rpm` and AppImage on your fork’s Releases page.
 
+## Releasing a fix
+
+Commit the fix and push a new tag, e.g. `git tag -a v1.2.1 -m "…" && git push origin v1.2.1`. GitHub builds and publishes the release; installed copies of Kadr find it within 6 hours (or at the next start) and update themselves. Builds made anywhere else are version `0.0.0-dev` and never update themselves.
+
 ## Sharing changes back
 
 Improvements are welcome: open an issue or a pull request. Please keep both versions in step and add the texts for all 7 languages.

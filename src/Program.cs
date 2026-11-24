@@ -46,12 +46,17 @@ namespace Kadr
             using (var mutex = new Mutex(true, "Kadr.SingleInstance.v1", out created))
             using (var signal = new EventWaitHandle(false, EventResetMode.AutoReset, "Kadr.Capture.v1"))
             {
+                if (!created && args.Contains("--updated"))
+                {
+                    // started by the updater: wait for the old version to quit
+                    try { created = mutex.WaitOne(20000); } catch (AbandonedMutexException) { created = true; }
+                }
                 if (!created)
                 {
                     if (!args.Contains("--tray")) signal.Set();
                     return 0;
                 }
-                Application.Run(new TrayApp(signal, args.Contains("--tray")));
+                Application.Run(new TrayApp(signal, args.Contains("--tray"), args.Contains("--updated")));
                 GC.KeepAlive(mutex);
             }
             return 0;

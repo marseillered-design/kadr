@@ -59,6 +59,7 @@ DEFAULTS = {
     "ImageFormat": "png",
     "JpegQuality": 90,
     "ShowNotifications": True,
+    "AutoUpdate": True,
     "ProxyMode": "system",
     "ProxyAddress": "",
     "ProxyUser": "",

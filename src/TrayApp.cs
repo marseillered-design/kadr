@@ -105,7 +105,17 @@ namespace Kadr
     /// <summary>Upload and save steps shared by the tray app and the "Send to" mode.</summary>
     static class Actions
     {
+        /// <summary>Uploads in progress; an update waits until there are none.</summary>
+        public static int Active;
+
         public static async Task<UploadResult> Upload(Settings s, byte[] data, string fileName, string dest, Image thumbSource, bool isScreenshot)
+        {
+            Active++;
+            try { return await UploadCore(s, data, fileName, dest, thumbSource, isScreenshot); }
+            finally { Active--; }
+        }
+
+        static async Task<UploadResult> UploadCore(Settings s, byte[] data, string fileName, string dest, Image thumbSource, bool isScreenshot)
         {
             var toast = s.ShowNotifications ? Toast.Show(thumbSource, L.F("Загружаю в {0}…", dest), fileName) : null;
             try
@@ -265,9 +275,10 @@ namespace Kadr
         HistoryForm historyForm;
         ToolStripMenuItem destMenu, shotItem, fullItem;
 
-        public TrayApp(EventWaitHandle captureSignal, bool quiet)
+        public TrayApp(EventWaitHandle captureSignal, bool quiet, bool updated = false)
         {
             S = Settings.Load();
+            Updater.Cleanup();
             ui = new Control();
             var h = ui.Handle;
 
@@ -300,7 +311,58 @@ namespace Kadr
             }
             else if (!quiet && S.ShowNotifications)
                 Toast.Info(null, L.T("Кадр работает"), S.HookPrintScreen ? L.F("{0} — снимок экрана.", Settings.KeyText(S.Hotkey)) : L.T("Снимок — щелчок по значку у часов."), null, 5);
+            if (updated)
+            {
+                string page = "https://github.com/" + Updater.Repo + "/releases/tag/v" + Updater.Version;
+                Toast.Info(null, L.F("Кадр обновлён до {0}", Updater.Version), L.T("Щёлкни, чтобы посмотреть, что нового."), () => Shell.Open(page), 10);
+            }
             TrimSoon(3000);
+
+            // look for a new version a minute after start, then every 6 hours
+            updateTimer = new System.Windows.Forms.Timer { Interval = 60 * 1000 };
+            updateTimer.Tick += (s, e) => { updateTimer.Interval = 6 * 60 * 60 * 1000; CheckForUpdates(false); };
+            updateTimer.Start();
+        }
+
+        readonly System.Windows.Forms.Timer updateTimer;
+        bool updating;
+
+        bool Busy { get { return capture != null || settingsForm != null || Actions.Active > 0; } }
+
+        /// <summary>
+        /// Asks GitHub for the latest release; if it is newer, downloads it and, once Kadr is idle,
+        /// installs it and restarts. manual = from the menu: also says when there is nothing new.
+        /// </summary>
+        async void CheckForUpdates(bool manual)
+        {
+            if (updating) return;
+            if (!manual && (!S.AutoUpdate || Updater.IsDev)) return;
+            if (manual && Updater.IsDev)
+            {
+                Toast.Info(null, L.T("Проверить обновления"), L.T("Это сборка для разработки — обновления выключены."), null);
+                return;
+            }
+            updating = true;
+            try
+            {
+                var r = await Updater.Latest();
+                if (Updater.Compare(r.Version, Updater.Version) <= 0)
+                {
+                    if (manual) Toast.Info(null, L.T("Проверить обновления"), L.F("У тебя последняя версия ({0}).", Updater.Version), null);
+                    return;
+                }
+                string file = await Updater.Download(r);
+                while (Busy) await Task.Delay(30 * 1000);       // never interrupt a capture, an upload or the settings
+                if (S.ShowNotifications || manual) Toast.Info(null, L.F("Обновляю Кадр до {0}…", r.Version), "", null, 5);
+                await Task.Delay(1500);
+                Updater.Install(file);
+                Quit();
+            }
+            catch (Exception ex)
+            {
+                if (manual) Toast.Info(null, L.T("Не удалось проверить обновления"), ex.Message, null, 10);
+            }
+            finally { updating = false; }
         }
 
         /// <summary>Frees memory a little after something big closed, unless a capture is open again.</summary>
@@ -327,6 +389,7 @@ namespace Kadr
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add(new ToolStripMenuItem(L.T("История загрузок"), null, (s, e) => ShowHistory()));
             menu.Items.Add(new ToolStripMenuItem(L.T("Настройки"), null, (s, e) => ShowSettings()));
+            menu.Items.Add(new ToolStripMenuItem(L.T("Проверить обновления"), null, (s, e) => CheckForUpdates(true)) { ShortcutKeyDisplayString = Updater.IsDev ? "dev" : Updater.Version });
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add(new ToolStripMenuItem(L.T("Выход"), null, (s, e) => Quit()));
             menu.Opening += (s, e) => FillDestinations();
@@ -541,6 +604,7 @@ namespace Kadr
 
         void Quit()
         {
+            if (updateTimer != null) updateTimer.Stop();
             hook.Stop();
             tray.Visible = false;
             tray.Dispose();

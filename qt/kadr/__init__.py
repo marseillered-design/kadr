@@ -1,1 +1,1 @@
-﻿__version__ = "1.1.0"
+__version__ = "0.0.0-dev"   # set from the release tag by the GitHub build

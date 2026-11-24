@@ -178,6 +178,11 @@ class SettingsDialog(QDialog):
         self.notify = QCheckBox(T("Показывать уведомления (об ошибках — всегда)"))
         self.notify.setChecked(s.ShowNotifications)
         v.addWidget(self.notify)
+        from . import updater
+        self.auto_update = QCheckBox(T("Обновляться автоматически"))
+        self.auto_update.setChecked(s.data.get("AutoUpdate", True))
+        v.addWidget(self.auto_update)
+        v.addWidget(hint(F("Версия {0}", updater.version() + (" (dev)" if updater.is_dev() else ""))))
         right.addWidget(g)
         right.addStretch(1)
 
@@ -292,7 +297,7 @@ class SettingsDialog(QDialog):
               SaveFolder=self.folder.text().strip() or s.SaveFolder, HookPrintScreen=self.hook.isChecked(),
               Hotkey=keys or s.Hotkey, Uploaders=self.ups, DefaultDestination=self.dest.currentText(),
               ImageFormat="jpg" if self.fmt.currentIndex() == 1 else "png", JpegQuality=self.quality.value(),
-              ShowNotifications=self.notify.isChecked(),
+              ShowNotifications=self.notify.isChecked(), AutoUpdate=self.auto_update.isChecked(),
               ProxyMode={1: "none", 2: "custom"}.get(self.proxy_mode.currentIndex(), "system"),
               ProxyAddress=self.proxy_addr.text().strip(), ProxyUser=self.proxy_user.text().strip(), Language=code)
         s.set_proxy_password(self.proxy_pass.text())

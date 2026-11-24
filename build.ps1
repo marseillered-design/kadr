@@ -5,7 +5,12 @@ $ErrorActionPreference = "Stop"
 $root = $PSScriptRoot
 $csc = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
 $refs = "/r:System.dll", "/r:System.Core.dll", "/r:System.Drawing.dll", "/r:System.Windows.Forms.dll", "/r:System.Net.Http.dll", "/r:System.Web.Extensions.dll", "/r:System.Security.dll"
-$src = Get-ChildItem "$root\src\*.cs" | ForEach-Object { $_.FullName }
+$src = @(Get-ChildItem "$root\src\*.cs" | ForEach-Object { $_.FullName })
+# Version for the updater: the release tag on GitHub (VERSION=v1.2.0), "0.0.0-dev" for builds made anywhere else
+$ver = if ($env:VERSION) { $env:VERSION.TrimStart("v") } else { "0.0.0-dev" }
+$verFile = Join-Path $env:TEMP "kadr-version.cs"
+"[assembly: System.Reflection.AssemblyInformationalVersion(`"$ver`")]" | Set-Content $verFile -Encoding UTF8
+$src += $verFile
 $ico = "$root\icons\kadr.ico"
 $common = @("/nologo", "/codepage:65001", "/optimize+", "/platform:anycpu", "/win32manifest:$root\app.manifest", "/resource:$ico,Kadr.icon.ico") + $refs
 

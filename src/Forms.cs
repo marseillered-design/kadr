@@ -127,7 +127,7 @@ namespace Kadr
         readonly ComboBox lang, format, proxyMode;
         readonly NumericUpDown quality;
         readonly TextBox proxyAddr, proxyUser, proxyPass;
-        readonly CheckBox notify;
+        readonly CheckBox notify, autoUpdate;
         public bool LanguageChanged;
         readonly ListBox list;
 
@@ -228,6 +228,9 @@ namespace Kadr
             Lay.Row(gen, sendTo);
             notify = Lay.Check(L.T("Показывать уведомления (об ошибках — всегда)"), s.ShowNotifications);
             Lay.Row(gen, notify);
+            autoUpdate = Lay.Check(L.T("Обновляться автоматически"), s.AutoUpdate);
+            Lay.Row(gen, autoUpdate);
+            Lay.Row(gen, Lay.Hint(L.F("Версия {0}", Updater.IsDev ? Updater.Version + " (dev)" : Updater.Version), 440));
             right.Controls.Add(Lay.Group(L.T("Общее"), gen));
 
             var ok = Lay.Button(L.T("Сохранить"), (o, e) => SaveAndClose());
@@ -349,6 +352,7 @@ namespace Kadr
             S.ImageFormat = format.SelectedIndex == 1 ? "jpg" : "png";
             S.JpegQuality = (int)quality.Value;
             S.ShowNotifications = notify.Checked;
+            S.AutoUpdate = autoUpdate.Checked;
             S.ProxyMode = proxyMode.SelectedIndex == 1 ? "none" : proxyMode.SelectedIndex == 2 ? "custom" : "system";
             S.ProxyAddress = proxyAddr.Text.Trim();
             S.ProxyUser = proxyUser.Text.Trim();

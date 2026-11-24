@@ -78,6 +78,8 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 
 [Run]
 Filename: "{app}\Kadr.exe"; Description: "{cm:LaunchProgram,Kadr}"; Flags: nowait postinstall skipifsilent
+; after a silent update started by Kadr itself: start it again
+Filename: "{app}\Kadr.exe"; Parameters: "--tray --updated"; Flags: nowait skipifnotsilent
 
 [UninstallRun]
 Filename: "{sys}\taskkill.exe"; Parameters: "/IM Kadr.exe /F"; Flags: runhidden; RunOnceId: "StopKadr"
