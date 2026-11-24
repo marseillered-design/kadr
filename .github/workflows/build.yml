@@ -12,6 +12,7 @@ env:
 
 jobs:
   linux:
+    timeout-minutes: 40
     runs-on: ubuntu-22.04          # older glibc = the packages run on more distributions
     defaults: { run: { working-directory: qt } }
     steps:
@@ -68,6 +69,7 @@ jobs:
         with: { name: selftest-linux, path: "qt/selftest*" }
 
   mac:
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
@@ -117,6 +119,7 @@ jobs:
         with: { name: "selftest-macos-${{ matrix.arch }}", path: "qt/selftest*" }
 
   windows:
+    timeout-minutes: 40
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -131,17 +134,21 @@ jobs:
           $ver = $env:VERSION.TrimStart("v").Split("-")[0]
           & $iscc "/DAppVersion=$ver" installer\windows\kadr.iss
           if ($LASTEXITCODE -ne 0) { exit 1 }
-      - name: Check the installer installs and uninstalls silently
+      - name: Check the installer installs, starts Kadr after a silent update, and uninstalls
         shell: powershell
         run: |
-          Start-Process dist\Kadr-Setup-Windows.exe -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/TASKS=sendto" -Wait
+          # WaitForExit, not Start-Process -Wait: -Wait would also wait for Kadr, which the silent install starts
+          $p = Start-Process dist\Kadr-Setup-Windows.exe -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/TASKS=sendto" -PassThru
+          $p.WaitForExit()
           $exe = "$env:LOCALAPPDATA\Programs\Kadr\Kadr.exe"
           if (-not (Test-Path $exe)) { Write-Error "not installed"; exit 1 }
+          Start-Sleep 5
+          if (-not (Get-Process Kadr -ErrorAction SilentlyContinue)) { Write-Error "Kadr did not start after the silent install"; exit 1 }
           Get-Process Kadr -ErrorAction SilentlyContinue | Stop-Process -Force
-          Start-Process "$env:LOCALAPPDATA\Programs\Kadr\unins000.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES" -Wait
-          Start-Sleep 3
+          Start-Process "$env:LOCALAPPDATA\Programs\Kadr\unins000.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES" | Out-Null
+          for ($i = 0; $i -lt 60 -and (Test-Path $exe); $i++) { Start-Sleep 1 }
           if (Test-Path $exe) { Write-Error "not uninstalled"; exit 1 }
-          "install + uninstall OK"
+          "install + restart + uninstall OK"
           Copy-Item dist\Kadr-Setup-Windows.exe .
       - uses: actions/upload-artifact@v4
         with:
@@ -151,6 +158,7 @@ jobs:
             Kadr.exe
 
   release:
+    timeout-minutes: 40
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [linux, mac, windows]
     runs-on: ubuntu-latest
