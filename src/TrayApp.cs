@@ -15,12 +15,15 @@ namespace Kadr
     {
         /// <summary>Fires with true for "whole screen" (only Shift+PrtScn when the hotkey is plain PrtScn).</summary>
         public event Action<bool> Pressed;
+        /// <summary>The recording hotkey: starts a recording, or stops the one in progress.</summary>
+        public event Action VideoPressed;
         public volatile int Hotkey = (int)(Keys.Shift | Keys.PageUp);
+        public volatile int VideoHotkey;
         Thread thread;
         uint threadId;
         IntPtr hook;
         Native.LowLevelKeyboardProc proc;
-        bool downSeen;
+        bool downSeen, videoDownSeen;
 
         public void Start()
         {
@@ -58,6 +61,24 @@ namespace Kadr
             if (nCode >= 0)
             {
                 int vk = System.Runtime.InteropServices.Marshal.ReadInt32(lParam);
+                int vh = VideoHotkey;
+                if (vh != 0 && vk == (vh & 0xFFFF))
+                {
+                    int m = wParam.ToInt32();
+                    bool isDown = m == Native.WM_KEYDOWN || m == Native.WM_SYSKEYDOWN;
+                    if (!isDown && videoDownSeen) { videoDownSeen = false; return (IntPtr)1; }
+                    int flags = System.Runtime.InteropServices.Marshal.ReadInt32(lParam, 8);
+                    bool alt = (flags & 0x20) != 0;
+                    bool ctrl = (Native.GetAsyncKeyState(0x11) & 0x8000) != 0;
+                    bool shift = (Native.GetAsyncKeyState(0x10) & 0x8000) != 0;
+                    bool win = (Native.GetAsyncKeyState(0x5B) & 0x8000) != 0 || (Native.GetAsyncKeyState(0x5C) & 0x8000) != 0;
+                    if (!win && alt == ((vh & (int)Keys.Alt) != 0) && ctrl == ((vh & (int)Keys.Control) != 0) && shift == ((vh & (int)Keys.Shift) != 0))
+                    {
+                        if (isDown && !videoDownSeen) { videoDownSeen = true; var h = VideoPressed; if (h != null) h(); }
+                        else if (!isDown && (vh & 0xFFFF) == 0x2C) { var h = VideoPressed; if (h != null) h(); }
+                        return (IntPtr)1;
+                    }
+                }
                 int hk = Hotkey;
                 int key = hk & 0xFFFF;
                 if (vk == key)
@@ -273,7 +294,10 @@ namespace Kadr
         CaptureForm capture;
         SettingsForm settingsForm;
         HistoryForm historyForm;
-        ToolStripMenuItem destMenu, shotItem, fullItem;
+        ToolStripMenuItem destMenu, shotItem, fullItem, videoItem;
+        Recorder rec;
+        RecordFrame recFrame;
+        RecordPanel recPanel;
 
         public TrayApp(EventWaitHandle captureSignal, bool quiet, bool updated = false)
         {
@@ -292,6 +316,7 @@ namespace Kadr
             tray.MouseUp += (s, e) => { if (e.Button == MouseButtons.Left) StartCapture(false); };
 
             hook.Pressed += full => ui.BeginInvoke((Action)(() => StartCapture(full)));
+            hook.VideoPressed += () => ui.BeginInvoke((Action)ToggleVideo);
             ApplyHook();
 
             var listener = new Thread(() =>
@@ -327,7 +352,7 @@ namespace Kadr
         readonly System.Windows.Forms.Timer updateTimer;
         bool updating;
 
-        bool Busy { get { return capture != null || settingsForm != null || Actions.Active > 0; } }
+        bool Busy { get { return capture != null || settingsForm != null || rec != null || Actions.Active > 0; } }
 
         /// <summary>
         /// Asks GitHub for the latest release; if it is newer, downloads it and, once Kadr is idle,
@@ -381,6 +406,8 @@ namespace Kadr
             menu.Items.Add(shotItem);
             fullItem = new ToolStripMenuItem(L.T("Снимок экрана целиком"), null, (s, e) => StartCapture(true));
             menu.Items.Add(fullItem);
+            videoItem = new ToolStripMenuItem(L.T("Записать видео"), null, (s, e) => ToggleVideo());
+            menu.Items.Add(videoItem);
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add(new ToolStripMenuItem(L.T("Загрузить картинку с компьютера…"), null, (s, e) => UploadFromDisk()));
             menu.Items.Add(new ToolStripMenuItem(L.T("Загрузить картинку из буфера"), null, (s, e) => UploadFromClipboard()));
@@ -392,7 +419,7 @@ namespace Kadr
             menu.Items.Add(new ToolStripMenuItem(L.T("Проверить обновления"), null, (s, e) => CheckForUpdates(true)) { ShortcutKeyDisplayString = Updater.IsDev ? "dev" : Updater.Version });
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add(new ToolStripMenuItem(L.T("Выход"), null, (s, e) => Quit()));
-            menu.Opening += (s, e) => FillDestinations();
+            menu.Opening += (s, e) => { FillDestinations(); videoItem.Text = rec != null ? L.T("Остановить запись") : L.T("Записать видео"); };
             return menu;
 
         }
@@ -400,7 +427,9 @@ namespace Kadr
         void ApplyHook()
         {
             hook.Hotkey = S.Hotkey;
+            hook.VideoHotkey = S.VideoHotkey;
             if (S.HookPrintScreen) hook.Start(); else hook.Stop();
+            videoItem.ShortcutKeyDisplayString = S.HookPrintScreen ? Settings.KeyText(S.VideoHotkey) : "";
             string key = Settings.KeyText(S.Hotkey);
             bool plainPrtScn = S.Hotkey == (int)Keys.PrintScreen;
             shotItem.ShortcutKeyDisplayString = S.HookPrintScreen ? key : "";
@@ -422,7 +451,7 @@ namespace Kadr
             destMenu.DropDownItems.Add(new ToolStripMenuItem(L.T("Добавить свой сервис…"), null, (s, e) => ShowSettings()));
         }
 
-        public void StartCapture(bool fullScreen)
+        public void StartCapture(bool fullScreen, bool video = false)
         {
             if (capture != null) { capture.Activate(); return; }
             var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -449,7 +478,7 @@ namespace Kadr
             long tGrab = sw.ElapsedMilliseconds;
             var wins = WindowList.Get(vs);
             long tWins = sw.ElapsedMilliseconds;
-            capture = new CaptureForm(S, bmp, vs, init, S.Destinations(), null, wins);
+            capture = new CaptureForm(S, bmp, vs, init, S.Destinations(), null, wins, video);
             long tForm = sw.ElapsedMilliseconds;
             capture.FormClosed += OnCaptureClosed;
             Timing(capture, sw, tGrab, tWins, tForm);
@@ -503,6 +532,7 @@ namespace Kadr
             capture = null;
             S.Save();
             TrimSoon();
+            if (f.Action == "record") { StartRecording(f.RecordArea, f.RecSys, f.RecMic); return; }
             var bmp = f.Output;
             if (bmp == null) return;
             switch (f.Action)
@@ -525,6 +555,99 @@ namespace Kadr
                     bmp.Dispose();
                     break;
             }
+        }
+
+        // ---------------- video ----------------
+
+        /// <summary>The recording hotkey and menu item: choose an area, or stop the recording in progress.</summary>
+        void ToggleVideo()
+        {
+            if (rec != null) { StopRecording(false); return; }
+            if (starting) return;
+            StartCapture(false, true);
+        }
+
+        bool starting;
+
+        void StartRecording(Rectangle area, bool sysAudio, bool mic)
+        {
+            if (rec != null || starting) return;
+            starting = true;
+            string path = Path.Combine(S.VideoFolder, L.T("Видео") + " " + DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss") + ".mp4");
+            var r = new Recorder(area, path, S.VideoFps, sysAudio, mic);
+            // a moment for the selection screen to disappear, so it is not in the first frame
+            var wait = new System.Windows.Forms.Timer { Interval = 150 };
+            wait.Tick += (s, e) =>
+            {
+                wait.Dispose();
+                starting = false;
+                try { r.Start(); }
+                catch (Exception ex)
+                {
+                    // Windows "N" editions come without the media components the encoder needs
+                    string msg = ex is DllNotFoundException ? L.T("Нужен «Пакет дополнительных компонентов мультимедиа» (Media Feature Pack): Параметры → Приложения → Дополнительные компоненты.") : ex.Message;
+                    Toast.Info(null, L.T("Не удалось начать запись"), msg, null, 15);
+                    return;
+                }
+                rec = r;
+                r.Failed += () => { try { ui.BeginInvoke((Action)(() => { if (rec == r) StopRecording(false); })); } catch { } };
+                recFrame = new RecordFrame(r.Area);
+                recFrame.Show();
+                recPanel = new RecordPanel(r.Area) { Elapsed = () => r.Elapsed, StopKey = Settings.KeyText(S.VideoHotkey) };
+                recPanel.PauseClicked += () => { r.SetPaused(!r.Paused); recPanel.Paused = r.Paused; recFrame.Paused = r.Paused; };
+                recPanel.StopClicked += () => StopRecording(false);
+                recPanel.DiscardClicked += () => StopRecording(true);
+                recPanel.Show();
+                tray.Text = L.F("Кадр — идёт запись ({0} — стоп)", Settings.KeyText(S.VideoHotkey));
+                string missing = (sysAudio && !r.SysAudioOn ? L.T("звук компьютера") : null) ?? (mic && !r.MicOn ? L.T("микрофон") : null);
+                if (missing != null) Toast.Info(null, L.T("Запись идёт без части звука"), L.F("Не нашлось устройство: {0}.", missing), null, 8);
+            };
+            wait.Start();
+        }
+
+        async void StopRecording(bool discard)
+        {
+            var r = rec;
+            if (r == null) return;
+            rec = null;
+            if (recPanel != null) { recPanel.Close(); recPanel = null; }
+            if (recFrame != null) { recFrame.Close(); recFrame = null; }
+            ApplyHook();
+            var duration = r.Elapsed;
+            bool ok = await Task.Run(() => r.Stop());
+            TrimSoon();
+            if (discard)
+            {
+                try { File.Delete(r.FilePath); } catch { }
+                if (r.Thumb != null) r.Thumb.Dispose();
+                return;
+            }
+            if (!ok)
+            {
+                string why = r.Error != null ? r.Error.Message : "";
+                Toast.Info(r.Thumb, L.T("Запись прервалась"), why, File.Exists(r.FilePath) ? (Action)(() => Shell.ShowInFolder(r.FilePath)) : null, 15);
+                return;
+            }
+            VideoSaved(r.FilePath, duration, r.Thumb);
+        }
+
+        /// <summary>"Video saved": a click plays it; buttons upload it or show it in its folder.</summary>
+        void VideoSaved(string path, TimeSpan duration, Bitmap thumb)
+        {
+            long bytes = 0;
+            try { bytes = new FileInfo(path).Length; } catch { }
+            var t = Toast.Info(thumb, L.T("Видео записано"), RecordUI.Duration(duration) + " · " + RecordUI.FileSize(bytes) + " · " + Path.GetFileName(path), () => Shell.Open(path), 20);
+            t.SetButton("\uE838", () => Shell.ShowInFolder(path), false);
+            t.AddButton("\uE898", () => UploadVideo(path, thumb));
+        }
+
+        async void UploadVideo(string path, Bitmap thumb)
+        {
+            byte[] data;
+            try { data = File.ReadAllBytes(path); }
+            catch (Exception ex) { Toast.Info(null, L.T("Не открылся файл"), ex.Message, null, 10); return; }
+            await Actions.Upload(S, data, Path.GetFileName(path), S.Default(), thumb, false);
+            TrimSoon();
         }
 
         async void UploadShot(Bitmap bmp, string dest)
@@ -605,6 +728,15 @@ namespace Kadr
         void Quit()
         {
             if (updateTimer != null) updateTimer.Stop();
+            if (rec != null)
+            {
+                // never lose a recording: finish the file before quitting
+                var r = rec;
+                rec = null;
+                if (recPanel != null) recPanel.Close();
+                if (recFrame != null) recFrame.Close();
+                r.Stop();
+            }
             hook.Stop();
             tray.Visible = false;
             tray.Dispose();

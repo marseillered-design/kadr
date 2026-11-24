@@ -21,6 +21,9 @@ namespace Kadr
         Action btnAction;
         bool btnTick;
         bool copyHot, copied;
+        string btn2Glyph;
+        Action btn2Action;
+        bool btn2Hot;
         bool busy, error;
         readonly float k;
         readonly Timer anim = new Timer { Interval = 30 };
@@ -116,6 +119,8 @@ namespace Kadr
 
         Rectangle CopyRect { get { int s = (int)(34 * k); return new Rectangle(Width - s - (int)(10 * k), Height - s - (int)(10 * k), s, s); } }
 
+        Rectangle Btn2Rect { get { var r = CopyRect; r.X -= r.Width + (int)(4 * k); return r; } }
+
         Rectangle CloseRect { get { int s = (int)(22 * k); return new Rectangle(Width - s - (int)(6 * k), (int)(6 * k), s, s); } }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -142,7 +147,7 @@ namespace Kadr
             int right = CloseRect.Left - (int)(4 * k);
             var tr = new Rectangle(x, (int)(18 * k), right - x, (int)(22 * k));
             TextRenderer.DrawText(g, title, titleFont, tr, fg, TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.Left);
-            int textRight = btnGlyph != null ? CopyRect.Left - (int)(6 * k) : Width - pad;
+            int textRight = btn2Glyph != null ? Btn2Rect.Left - (int)(6 * k) : btnGlyph != null ? CopyRect.Left - (int)(6 * k) : Width - pad;
             var sr = new Rectangle(x, (int)(44 * k), textRight - x, (int)(36 * k));
             TextRenderer.DrawText(g, text ?? "", textFont, sr, sub, TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.WordBreak | TextFormatFlags.Left);
 
@@ -162,6 +167,17 @@ namespace Kadr
                     g.DrawString(copied ? "\uE73E" : btnGlyph, copyFont, b, cr, sf);
             }
 
+            if (btn2Glyph != null)
+            {
+                var r2 = Btn2Rect;
+                if (btn2Hot)
+                    using (var path = UI.Round(r2, 6 * k))
+                    using (var hb = new SolidBrush(dark ? Color.FromArgb(62, 62, 66) : Color.FromArgb(234, 236, 240))) g.FillPath(hb, path);
+                using (var b = new SolidBrush(dark ? Color.FromArgb(225, 225, 225) : Color.FromArgb(50, 50, 54)))
+                using (var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+                    g.DrawString(btn2Glyph, copyFont, b, r2, sf);
+            }
+
             if (busy)
             {
                 int h = Math.Max(2, (int)(3 * k));
@@ -172,13 +188,14 @@ namespace Kadr
         }
 
         protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); hot = true; }
-        protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); hot = false; if (copyHot) { copyHot = false; Invalidate(); } }
+        protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); hot = false; if (copyHot || btn2Hot) { copyHot = btn2Hot = false; Invalidate(); } }
 
         protected override void OnMouseMove(MouseEventArgs e)
         {
             base.OnMouseMove(e);
             bool h = btnGlyph != null && CopyRect.Contains(e.Location);
-            if (h != copyHot) { copyHot = h; Invalidate(); }
+            bool h2 = btn2Glyph != null && Btn2Rect.Contains(e.Location);
+            if (h != copyHot || h2 != btn2Hot) { copyHot = h; btn2Hot = h2; Invalidate(); }
         }
 
         /// <summary>An icon button in the bottom-right corner (copy the link, open the folder…).</summary>
@@ -187,6 +204,14 @@ namespace Kadr
             btnGlyph = glyph;
             btnAction = action;
             btnTick = tickFeedback;
+            Invalidate();
+        }
+
+        /// <summary>A second icon button, left of the first (e.g. upload the video). Closes the notice when pressed.</summary>
+        public void AddButton(string glyph, Action action)
+        {
+            btn2Glyph = glyph;
+            btn2Action = action;
             Invalidate();
         }
 
@@ -209,6 +234,7 @@ namespace Kadr
             base.OnMouseClick(e);
             if (CloseRect.Contains(e.Location) || e.Button == MouseButtons.Right) { Close(); return; }
             if (btnGlyph != null && CopyRect.Contains(e.Location)) { PressButton(); return; }
+            if (btn2Glyph != null && Btn2Rect.Contains(e.Location)) { var a = btn2Action; Close(); if (a != null) a(); return; }
             if (onClick != null) onClick();
             if (!busy) Close();
         }

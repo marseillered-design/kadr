@@ -128,6 +128,10 @@ namespace Kadr
         readonly NumericUpDown quality;
         readonly TextBox proxyAddr, proxyUser, proxyPass;
         readonly CheckBox notify, autoUpdate;
+        readonly HotkeyBox videoKey;
+        readonly CheckBox vSys, vMic;
+        readonly ComboBox vFps;
+        readonly TextBox vFolder;
         public bool LanguageChanged;
         readonly ListBox list;
 
@@ -210,6 +214,24 @@ namespace Kadr
             Lay.Row(sv, new Label(), Lay.Hint(L.T("Для сохранения и загрузки снимков. PNG — без потерь, JPG — файл меньше."), 300));
             right.Controls.Add(Lay.Group(L.T("Сохранение"), sv));
 
+            // Video
+            var vg = Lay.Table(2);
+            videoKey = new HotkeyBox(s.VideoHotkey);
+            videoKey.Margin = new Padding(0, UI.S(3), 0, UI.S(3));
+            Lay.Row(vg, Lay.Label(L.T("Начать и остановить:")), videoKey);
+            vSys = Lay.Check(L.T("Звук компьютера"), s.VideoSysAudio);
+            vMic = Lay.Check(L.T("Микрофон"), s.VideoMic);
+            Lay.Row(vg, Lay.Label(L.T("Звук:")), Lay.Flow(vSys, vMic));
+            vFps = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = UI.S(80), Margin = new Padding(0, UI.S(3), 0, UI.S(3)) };
+            vFps.Items.AddRange(new object[] { "15", "30", "60" });
+            vFps.SelectedItem = s.VideoFps.ToString();
+            if (vFps.SelectedIndex < 0) vFps.SelectedIndex = 1;
+            Lay.Row(vg, Lay.Label(L.T("Кадров в секунду:")), vFps);
+            vFolder = Lay.Text(300, s.VideoFolder);
+            Lay.Row(vg, Lay.Label(L.T("Папка:")), Lay.Flow(vFolder, Lay.Button(L.T("Обзор…"), (o, e) => PickVideoFolder())));
+            Lay.Row(vg, new Label(), Lay.Hint(L.T("Видео сохраняется в MP4. Звук и микрофон можно включить и перед записью, на панели выбора области."), 300));
+            right.Controls.Add(Lay.Group(L.T("Запись видео"), vg));
+
             // General
             var gen = Lay.Table(1);
             lang = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = UI.S(170), Margin = new Padding(0, UI.S(3), 0, UI.S(3)) };
@@ -220,6 +242,8 @@ namespace Kadr
             hotkey = new HotkeyBox(s.Hotkey);
             hookKey.CheckedChanged += (o, e) => hotkey.Enabled = hookKey.Checked;
             hotkey.Enabled = hookKey.Checked;
+            hookKey.CheckedChanged += (o, e) => videoKey.Enabled = hookKey.Checked;
+            videoKey.Enabled = hookKey.Checked;
             autostart = Lay.Check(L.T("Запускать Кадр вместе с Windows"), Shell.Autostart);
             sendTo = Lay.Check(L.T("Пункт «Кадр (загрузить)» в меню «Отправить» для картинок"), Shell.SendTo);
             Lay.Row(gen, Lay.Flow(hookKey, hotkey));
@@ -334,6 +358,12 @@ namespace Kadr
                 if (d.ShowDialog(this) == DialogResult.OK) folder.Text = d.SelectedPath;
         }
 
+        void PickVideoFolder()
+        {
+            using (var d = new FolderBrowserDialog { SelectedPath = vFolder.Text, Description = L.T("Куда сохранять видео") })
+                if (d.ShowDialog(this) == DialogResult.OK) vFolder.Text = d.SelectedPath;
+        }
+
         void ImgurHelp()
         {
             var text = L.T("imgur.help");
@@ -364,7 +394,21 @@ namespace Kadr
                 hotkey.Focus();
                 return;
             }
+            if (hookKey.Checked && (!Settings.HotkeyAllowed(videoKey.Value) || videoKey.Value == hotkey.Value))
+            {
+                MessageBox.Show(this, videoKey.Value == hotkey.Value
+                    ? L.T("Для снимка и для видео нужны разные сочетания клавиш.")
+                    : L.F("Сочетание «{0}» мешало бы печатать. Добавь Ctrl, Alt или Shift (например Shift+PageUp) или возьми F1–F12, PrtScn, Pause, Insert, PageUp.", Settings.KeyText(videoKey.Value)),
+                    L.T("Кадр"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                videoKey.Focus();
+                return;
+            }
             S.Hotkey = hotkey.Value;
+            S.VideoHotkey = videoKey.Value;
+            S.VideoSysAudio = vSys.Checked;
+            S.VideoMic = vMic.Checked;
+            S.VideoFps = int.Parse((string)vFps.SelectedItem ?? "30");
+            S.VideoFolder = string.IsNullOrWhiteSpace(vFolder.Text) ? new Settings().VideoFolder : vFolder.Text.Trim();
             string code = L.Codes[Math.Max(0, lang.SelectedIndex)];
             LanguageChanged = code != L.Current;
             S.Language = code;

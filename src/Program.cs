@@ -34,6 +34,7 @@ namespace Kadr
             if (args.Length >= 3 && args[0] == "--upload-test") { return UploadTest(args[1], args[2]); }
             if (args.Length >= 2 && args[0] == "--form-test") { FormTest(args[1]); return 0; }
             if (args.Length >= 3 && args[0] == "--print-test") { using (var img = Image.FromFile(args[1])) Actions.Print(img, args[2]); return 0; }
+            if (args.Length >= 3 && args[0] == "--record-test") { return RecordTest(args); }
 
             var files = args.Where(a => !a.StartsWith("--") && File.Exists(a)).ToArray();
             if (files.Length > 0)
@@ -110,8 +111,66 @@ namespace Kadr
                     b.Save(Path.Combine(outDir, "overlay-hover.png"), ImageFormat.Png);
                 }
             }
+            using (var form = new CaptureForm(s, FakeScreen(vs.Width, vs.Height), vs, null, s.Destinations(), 1.25f, null, true))
+            {
+                form.TestSelect(new Rectangle(240, 140, 960, 540));
+                using (var b = new Bitmap(vs.Width, vs.Height))
+                {
+                    using (var g = Graphics.FromImage(b)) form.PaintTo(g, vs);
+                    b.Save(Path.Combine(outDir, "overlay-video.png"), ImageFormat.Png);
+                }
+            }
             using (var ic = AppIcon.Draw(256)) ic.Save(Path.Combine(outDir, "icon-256.png"), ImageFormat.Png);
             using (var ic = AppIcon.Draw(16)) ic.Save(Path.Combine(outDir, "icon-16.png"), ImageFormat.Png);
+        }
+
+        /// <summary>--record-test out.mp4 seconds [x y w h] [sys] [mic] [fps=N]: records without any window and prints what came out.</summary>
+        static int RecordTest(string[] args)
+        {
+            double secs = double.Parse(args[2], System.Globalization.CultureInfo.InvariantCulture);
+            var area = Screen.PrimaryScreen.Bounds;
+            int fps = 30;
+            var nums = args.Skip(3).Select(a => { int v; return int.TryParse(a, out v) ? (int?)v : null; }).Where(v => v.HasValue).Select(v => v.Value).ToArray();
+            if (nums.Length >= 4) area = new Rectangle(nums[0], nums[1], nums[2], nums[3]);
+            var f = args.FirstOrDefault(a => a.StartsWith("fps="));
+            if (f != null) fps = int.Parse(f.Substring(4));
+            var r = new Recorder(area, Path.GetFullPath(args[1]), fps, args.Contains("sys"), args.Contains("mic"));
+            var cpu = System.Diagnostics.Process.GetCurrentProcess();
+            var t0 = cpu.TotalProcessorTime;
+            System.Media.SoundPlayer player = null;
+            if (args.Contains("tone"))
+            {
+                // a quiet 440 Hz tone, so the computer-sound track has something to capture
+                var ms = new MemoryStream();
+                var w = new BinaryWriter(ms);
+                int rate = 48000, n = rate * (int)Math.Ceiling(secs + 1);
+                w.Write(0x46464952); w.Write(36 + n * 2); w.Write(0x45564157); w.Write(0x20746d66); w.Write(16);
+                w.Write((short)1); w.Write((short)1); w.Write(rate); w.Write(rate * 2); w.Write((short)2); w.Write((short)16);
+                w.Write(0x61746164); w.Write(n * 2);
+                for (int i = 0; i < n; i++) w.Write((short)(Math.Sin(2 * Math.PI * 440 * i / rate) * 3000));
+                ms.Position = 0;
+                player = new System.Media.SoundPlayer(ms);
+                player.Load();
+            }
+            try { r.Start(); }
+            catch (Exception ex) { Console.WriteLine("START ERROR " + ex); return 1; }
+            if (player != null) player.Play();
+            if (args.Contains("pause"))
+            {
+                // a third of the time paused: the video should come out a third shorter
+                Thread.Sleep((int)(secs * 333)); r.SetPaused(true);
+                Thread.Sleep((int)(secs * 333)); r.SetPaused(false);
+                Thread.Sleep((int)(secs * 333));
+            }
+            else Thread.Sleep((int)(secs * 1000));
+            bool ok = r.Stop();
+            if (player != null) player.Stop();
+            if (r.Thumb != null) r.Thumb.Save(Path.ChangeExtension(Path.GetFullPath(args[1]), ".png"), ImageFormat.Png);
+            cpu.Refresh();
+            Console.WriteLine("ok={0} frames={1} fps={2:0.0} size={3} out={4} sys={5} mic={6} bytes={7} cpu={8:0}%", ok, r.Frames, r.Frames / secs, r.Area.Size, r.OutSize, r.SysAudioOn, r.MicOn, r.Bytes,
+                (cpu.TotalProcessorTime - t0).TotalMilliseconds / (secs * 1000) * 100 / Environment.ProcessorCount * Environment.ProcessorCount);
+            if (!ok) Console.WriteLine("ERROR " + r.Error);
+            return ok ? 0 : 1;
         }
 
         static int UploadTest(string configPath, string imagePath)
@@ -174,6 +233,28 @@ namespace Kadr
                 b.Save(Path.Combine(outDir, "toast.png"), ImageFormat.Png);
             }
             t.Close();
+
+            var vt = Toast.Info(FakeScreen(800, 450), L.T("Видео записано"), RecordUI.Duration(TimeSpan.FromSeconds(83)) + " · " + RecordUI.FileSize(12345678) + " · " + L.T("Видео") + " 2026-11-24 15-30-00.mp4", null, 8);
+            vt.SetButton("", null, false);
+            vt.AddButton("", null);
+            Application.DoEvents();
+            using (var b = new Bitmap(vt.Width, vt.Height))
+            {
+                vt.DrawToBitmap(b, new Rectangle(0, 0, vt.Width, vt.Height));
+                b.Save(Path.Combine(outDir, "toast-video.png"), ImageFormat.Png);
+            }
+            vt.Close();
+            var rp = new RecordPanel(new Rectangle(200, 200, 800, 450)) { Elapsed = () => TimeSpan.FromSeconds(75), StopKey = "Shift+PageDown" };
+            rp.StartPosition = FormStartPosition.Manual;
+            rp.Show();
+            rp.Location = new Point(-5000, -5000);
+            Application.DoEvents();
+            using (var b = new Bitmap(rp.Width, rp.Height))
+            {
+                rp.DrawToBitmap(b, new Rectangle(0, 0, rp.Width, rp.Height));
+                b.Save(Path.Combine(outDir, "record-panel.png"), ImageFormat.Png);
+            }
+            rp.Close();
 
             var sv = Toast.Info(FakeScreen(800, 450), L.T("Снимок сохранён"), @"C:\Users\me\Pictures\Kadr\Screenshot 2026-11-22 19-40-00.png", null, 8);
             sv.SetButton("\uE838", null, false);

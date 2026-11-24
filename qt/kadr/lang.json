@@ -1609,5 +1609,311 @@
 "Catbox et Imgur fonctionnent tout de suite. Votre propre Client ID Imgur est facultatif.",
 "Catbox e Imgur funcionan al instante. Tu propio Client ID de Imgur es opcional.",
 "Catbox e Imgur funzionano subito. Il tuo Client ID di Imgur è facoltativo."
+],
+"Записать видео": [
+"Записать видео",
+"Записати відео",
+"Record video",
+"Video aufnehmen",
+"Enregistrer une vidéo",
+"Grabar vídeo",
+"Registra video"
+],
+"Остановить запись": [
+"Остановить запись",
+"Зупинити запис",
+"Stop recording",
+"Aufnahme beenden",
+"Arrêter l’enregistrement",
+"Detener la grabación",
+"Interrompi la registrazione"
+],
+"Записать": [
+"Записать",
+"Записати",
+"Record",
+"Aufnehmen",
+"Enregistrer",
+"Grabar",
+"Registra"
+],
+"Начать запись (Enter)": [
+"Начать запись (Enter)",
+"Почати запис (Enter)",
+"Start recording (Enter)",
+"Aufnahme starten (Enter)",
+"Démarrer l’enregistrement (Entrée)",
+"Empezar a grabar (Enter)",
+"Avvia la registrazione (Invio)"
+],
+"Звук компьютера: вкл.": [
+"Звук компьютера: вкл.",
+"Звук комп’ютера: увімк.",
+"Computer sound: on",
+"Computerton: an",
+"Son de l’ordinateur : activé",
+"Sonido del equipo: activado",
+"Audio del computer: attivo"
+],
+"Звук компьютера: выкл.": [
+"Звук компьютера: выкл.",
+"Звук комп’ютера: вимк.",
+"Computer sound: off",
+"Computerton: aus",
+"Son de l’ordinateur : désactivé",
+"Sonido del equipo: desactivado",
+"Audio del computer: disattivo"
+],
+"Микрофон: вкл.": [
+"Микрофон: вкл.",
+"Мікрофон: увімк.",
+"Microphone: on",
+"Mikrofon: an",
+"Micro : activé",
+"Micrófono: activado",
+"Microfono: attivo"
+],
+"Микрофон: выкл.": [
+"Микрофон: выкл.",
+"Мікрофон: вимк.",
+"Microphone: off",
+"Mikrofon: aus",
+"Micro : désactivé",
+"Micrófono: desactivado",
+"Microfono: disattivo"
+],
+"Выдели область для видео или щёлкни по окну · Esc — отмена": [
+"Выдели область для видео или щёлкни по окну · Esc — отмена",
+"Виділи область для відео або клацни по вікну · Esc — скасувати",
+"Drag to select the area to record or click a window · Esc to cancel",
+"Aufnahmebereich aufziehen oder auf ein Fenster klicken · Esc zum Abbrechen",
+"Sélectionnez la zone à enregistrer ou cliquez sur une fenêtre · Échap pour annuler",
+"Arrastra para elegir el área a grabar o haz clic en una ventana · Esc para cancelar",
+"Trascina per scegliere l’area da registrare o fai clic su una finestra · Esc per annullare"
+],
+"Видео": [
+"Видео",
+"Відео",
+"Video",
+"Video",
+"Vidéo",
+"Vídeo",
+"Video"
+],
+"Не удалось начать запись": [
+"Не удалось начать запись",
+"Не вдалося почати запис",
+"Could not start recording",
+"Aufnahme konnte nicht starten",
+"Impossible de démarrer l’enregistrement",
+"No se pudo empezar a grabar",
+"Impossibile avviare la registrazione"
+],
+"Кадр — идёт запись ({0} — стоп)": [
+"Кадр — идёт запись ({0} — стоп)",
+"Кадр — триває запис ({0} — стоп)",
+"Kadr — recording ({0} to stop)",
+"Kadr — Aufnahme läuft ({0} zum Beenden)",
+"Kadr — enregistrement ({0} pour arrêter)",
+"Kadr — grabando ({0} para detener)",
+"Kadr — registrazione in corso ({0} per fermare)"
+],
+"звук компьютера": [
+"звук компьютера",
+"звук комп’ютера",
+"computer sound",
+"Computerton",
+"son de l’ordinateur",
+"sonido del equipo",
+"audio del computer"
+],
+"микрофон": [
+"микрофон",
+"мікрофон",
+"microphone",
+"Mikrofon",
+"micro",
+"micrófono",
+"microfono"
+],
+"Запись идёт без части звука": [
+"Запись идёт без части звука",
+"Запис іде без частини звуку",
+"Recording without some of the sound",
+"Aufnahme ohne einen Teil des Tons",
+"Enregistrement sans une partie du son",
+"Grabando sin parte del sonido",
+"Registrazione senza parte dell’audio"
+],
+"Не нашлось устройство: {0}.": [
+"Не нашлось устройство: {0}.",
+"Не знайшовся пристрій: {0}.",
+"No device found for {0}.",
+"Kein Gerät gefunden: {0}.",
+"Aucun appareil trouvé : {0}.",
+"No se encontró el dispositivo: {0}.",
+"Nessun dispositivo trovato: {0}."
+],
+"Запись прервалась": [
+"Запись прервалась",
+"Запис перервався",
+"Recording stopped unexpectedly",
+"Aufnahme unerwartet beendet",
+"L’enregistrement s’est interrompu",
+"La grabación se interrumpió",
+"La registrazione si è interrotta"
+],
+"Видео записано": [
+"Видео записано",
+"Відео записано",
+"Video recorded",
+"Video aufgenommen",
+"Vidéo enregistrée",
+"Vídeo grabado",
+"Video registrato"
+],
+"Продолжить": [
+"Продолжить",
+"Продовжити",
+"Resume",
+"Fortsetzen",
+"Reprendre",
+"Reanudar",
+"Riprendi"
+],
+"Пауза": [
+"Пауза",
+"Пауза",
+"Pause",
+"Pause",
+"Pause",
+"Pausa",
+"Pausa"
+],
+"Остановить и сохранить ({0})": [
+"Остановить и сохранить ({0})",
+"Зупинити й зберегти ({0})",
+"Stop and save ({0})",
+"Beenden und speichern ({0})",
+"Arrêter et enregistrer ({0})",
+"Detener y guardar ({0})",
+"Ferma e salva ({0})"
+],
+"Остановить и удалить": [
+"Остановить и удалить",
+"Зупинити й видалити",
+"Stop and discard",
+"Beenden und verwerfen",
+"Arrêter et supprimer",
+"Detener y descartar",
+"Ferma ed elimina"
+],
+"{0} КБ": [
+"{0} КБ",
+"{0} КБ",
+"{0} KB",
+"{0} KB",
+"{0} Ko",
+"{0} KB",
+"{0} KB"
+],
+"{0} МБ": [
+"{0} МБ",
+"{0} МБ",
+"{0} MB",
+"{0} MB",
+"{0} Mo",
+"{0} MB",
+"{0} MB"
+],
+"Начать и остановить:": [
+"Начать и остановить:",
+"Почати й зупинити:",
+"Start and stop:",
+"Starten und beenden:",
+"Démarrer et arrêter :",
+"Empezar y detener:",
+"Avvia e ferma:"
+],
+"Звук компьютера": [
+"Звук компьютера",
+"Звук комп’ютера",
+"Computer sound",
+"Computerton",
+"Son de l’ordinateur",
+"Sonido del equipo",
+"Audio del computer"
+],
+"Микрофон": [
+"Микрофон",
+"Мікрофон",
+"Microphone",
+"Mikrofon",
+"Micro",
+"Micrófono",
+"Microfono"
+],
+"Звук:": [
+"Звук:",
+"Звук:",
+"Sound:",
+"Ton:",
+"Son :",
+"Sonido:",
+"Audio:"
+],
+"Кадров в секунду:": [
+"Кадров в секунду:",
+"Кадрів за секунду:",
+"Frames per second:",
+"Bilder pro Sekunde:",
+"Images par seconde :",
+"Fotogramas por segundo:",
+"Fotogrammi al secondo:"
+],
+"Видео сохраняется в MP4. Звук и микрофон можно включить и перед записью, на панели выбора области.": [
+"Видео сохраняется в MP4. Звук и микрофон можно включить и перед записью, на панели выбора области.",
+"Відео зберігається в MP4. Звук і мікрофон можна ввімкнути й перед записом, на панелі вибору області.",
+"Videos are saved as MP4. Sound and microphone can also be switched on the area selection bar before recording.",
+"Videos werden als MP4 gespeichert. Ton und Mikrofon lassen sich auch vor der Aufnahme in der Leiste zur Bereichsauswahl schalten.",
+"Les vidéos sont enregistrées en MP4. Le son et le micro se règlent aussi avant l’enregistrement, dans la barre de sélection de zone.",
+"Los vídeos se guardan en MP4. El sonido y el micrófono también se activan antes de grabar, en la barra de selección del área.",
+"I video vengono salvati in MP4. Audio e microfono si possono attivare anche prima di registrare, nella barra di selezione dell’area."
+],
+"Запись видео": [
+"Запись видео",
+"Запис відео",
+"Screen recording",
+"Bildschirmaufnahme",
+"Enregistrement vidéo",
+"Grabación de vídeo",
+"Registrazione video"
+],
+"Куда сохранять видео": [
+"Куда сохранять видео",
+"Куди зберігати відео",
+"Where to save videos",
+"Wo Videos gespeichert werden",
+"Où enregistrer les vidéos",
+"Dónde guardar los vídeos",
+"Dove salvare i video"
+],
+"Для снимка и для видео нужны разные сочетания клавиш.": [
+"Для снимка и для видео нужны разные сочетания клавиш.",
+"Для знімка й для відео потрібні різні сполучення клавіш.",
+"Screenshots and videos need different key combinations.",
+"Screenshot und Video brauchen unterschiedliche Tastenkombinationen.",
+"Les captures et les vidéos doivent avoir des raccourcis différents.",
+"Las capturas y los vídeos necesitan combinaciones de teclas distintas.",
+"Screenshot e video richiedono combinazioni di tasti diverse."
+],
+"Нужен «Пакет дополнительных компонентов мультимедиа» (Media Feature Pack): Параметры → Приложения → Дополнительные компоненты.": [
+"Нужен «Пакет дополнительных компонентов мультимедиа» (Media Feature Pack): Параметры → Приложения → Дополнительные компоненты.",
+"Потрібен «Пакет компонентів мультимедіа» (Media Feature Pack): Параметри → Програми → Додаткові компоненти.",
+"Windows needs the Media Feature Pack: Settings → Apps → Optional features.",
+"Windows braucht das Media Feature Pack: Einstellungen → Apps → Optionale Features.",
+"Windows a besoin du Media Feature Pack : Paramètres → Applications → Fonctionnalités facultatives.",
+"Windows necesita el Media Feature Pack: Configuración → Aplicaciones → Características opcionales.",
+"Windows richiede il Media Feature Pack: Impostazioni → App → Funzionalità facoltative."
 ]
 }

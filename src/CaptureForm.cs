@@ -9,7 +9,7 @@ using System.Windows.Forms;
 
 namespace Kadr
 {
-    enum Cmd { Tool, Color, Undo, Upload, UploadMenu, Copy, Save, Print, Close }
+    enum Cmd { Tool, Color, Undo, Upload, UploadMenu, Copy, Save, Print, Close, Record, Sound, Mic }
 
     class Btn
     {
@@ -26,6 +26,10 @@ namespace Kadr
         public Bitmap Output;
         public string Action;
         public string Destination;
+        /// <summary>Video mode: the area to record, in screen pixels, and the sound switches.</summary>
+        public Rectangle RecordArea;
+        public bool RecSys, RecMic;
+        readonly bool video;
 
         readonly Bitmap shot;
         static readonly SolidBrush Dim = new SolidBrush(Color.FromArgb(115, 0, 0, 0));
@@ -86,9 +90,12 @@ namespace Kadr
         readonly List<Rectangle> wins;
         Rectangle hoverWin, downWin;
 
-        public CaptureForm(Settings s, Bitmap shot, Rectangle virtualScreen, Rectangle? initial, List<string> destinations, float? scale = null, List<Rectangle> windows = null)
+        public CaptureForm(Settings s, Bitmap shot, Rectangle virtualScreen, Rectangle? initial, List<string> destinations, float? scale = null, List<Rectangle> windows = null, bool video = false)
         {
             S = s;
+            this.video = video;
+            RecSys = s.VideoSysAudio;
+            RecMic = s.VideoMic;
             palette_ = ParsePalette(s.Palette);
             wins = windows ?? new List<Rectangle>();
             this.shot = shot;
@@ -194,7 +201,19 @@ namespace Kadr
                 new Btn { Cmd = Cmd.Close, Tip = L.T("Закрыть (Esc)") },
             };
 
-            int aw = (actions.Length - 1) * bs + narrow + 2 * pad, ah = bs + 2 * pad;
+            if (video)
+            {
+                actions = new[]
+                {
+                    new Btn { Cmd = Cmd.Record, Tip = L.T("Начать запись (Enter)") },
+                    new Btn { Cmd = Cmd.Sound, Tip = RecSys ? L.T("Звук компьютера: вкл.") : L.T("Звук компьютера: выкл.") },
+                    new Btn { Cmd = Cmd.Mic, Tip = RecMic ? L.T("Микрофон: вкл.") : L.T("Микрофон: выкл.") },
+                    new Btn { Cmd = Cmd.Close, Tip = L.T("Закрыть (Esc)") },
+                };
+                tools = new Btn[0];
+            }
+            int recW = RecordWidth();
+            int aw = actions.Sum(a => a.Cmd == Cmd.UploadMenu ? narrow : a.Cmd == Cmd.Record ? recW : bs) + 2 * pad, ah = bs + 2 * pad;
             int ax = sel.Right - aw, ay = sel.Bottom + gap;
             if (ay + ah > mon.Bottom - gap)
             {
@@ -206,14 +225,15 @@ namespace Kadr
 
             int tw = bs + 2 * pad, th = tools.Length * bs + 2 * pad;
             int tx = sel.Right + gap;
+            if (tools.Length == 0) tw = th = 0;
             if (tx + tw > mon.Right - gap)
             {
                 tx = sel.Left - gap - tw;
                 if (tx < mon.Left + gap) tx = sel.Right - tw - gap;
             }
             int ty = Math.Max(mon.Top + gap, Math.Min(sel.Bottom - th, mon.Bottom - th - gap));
-            toolsBar = new Rectangle(tx, ty, tw, th);
-            if (toolsBar.IntersectsWith(actionsBar))
+            toolsBar = tools.Length == 0 ? Rectangle.Empty : new Rectangle(tx, ty, tw, th);
+            if (!toolsBar.IsEmpty && toolsBar.IntersectsWith(actionsBar))
                 toolsBar.Y = Math.Max(mon.Top + gap, actionsBar.Top - gap - th);
 
             for (int i = 0; i < tools.Length; i++)
@@ -225,13 +245,13 @@ namespace Kadr
             int x = actionsBar.X + pad;
             foreach (var a in actions)
             {
-                int w = a.Cmd == Cmd.UploadMenu ? narrow : bs;
+                int w = a.Cmd == Cmd.UploadMenu ? narrow : a.Cmd == Cmd.Record ? recW : bs;
                 a.R = new Rectangle(x, actionsBar.Y + pad, w, bs);
                 x += w;
                 btns.Add(a);
             }
 
-            if (palette)
+            if (palette && !video)
             {
                 var cb = btns.First(b => b.Cmd == Cmd.Color).R;
                 int sw = Sc(26);
@@ -242,6 +262,11 @@ namespace Kadr
                 for (int i = 0; i < palette_.Length; i++)
                     swatches.Add(new KeyValuePair<Rectangle, Color>(new Rectangle(paletteRect.X + pad + i * sw, paletteRect.Y + pad, sw, sw), palette_[i]));
             }
+        }
+
+        int RecordWidth()
+        {
+            return Sc(34) + TextRenderer.MeasureText(L.T("Записать"), uiFont).Width + Sc(10);
         }
 
         Rectangle TipRect(Graphics g, Btn b, out string text)
@@ -295,8 +320,8 @@ namespace Kadr
                 var l = SizeLabelRect(); l.Width += Sc(60); add(l);
             }
             else add(HintRect());
-            var bars = Rectangle.Union(toolsBar, actionsBar);
-            if (!toolsBar.IsEmpty) { bars.Inflate(Sc(260), Sc(48)); add(bars); }
+            var bars = toolsBar.IsEmpty ? actionsBar : Rectangle.Union(toolsBar, actionsBar);
+            if (!bars.IsEmpty) { bars.Inflate(Sc(260), Sc(48)); add(bars); }
             if (!paletteRect.IsEmpty) { var p = paletteRect; p.Inflate(Sc(4), Sc(4)); add(p); }
             if (sizeTip != null) add(new Rectangle(mouse.X - Sc(20), mouse.Y - Sc(20), Sc(200), Sc(80)));
             return f;
@@ -356,7 +381,7 @@ namespace Kadr
 
             if (BarsVisible)
             {
-                DrawBar(g, toolsBar);
+                if (!toolsBar.IsEmpty) DrawBar(g, toolsBar);
                 DrawBar(g, actionsBar);
                 foreach (var b in btns) DrawButton(g, b);
                 if (palette) DrawPalette(g);
@@ -514,7 +539,7 @@ namespace Kadr
         void DrawHint(Graphics g)
         {
             var r = HintRect();
-            string text = L.T("Выдели область мышью или щёлкни по окну · Esc — отмена");
+            string text = video ? L.T("Выдели область для видео или щёлкни по окну · Esc — отмена") : L.T("Выдели область мышью или щёлкни по окну · Esc — отмена");
             var sz = g.MeasureString(text, uiFont);
             r = new Rectangle(r.X + (r.Width - (int)sz.Width - Sc(28)) / 2, r.Y, (int)sz.Width + Sc(28), r.Height);
             using (var path = UI.Round(r, Sc(10)))
@@ -538,7 +563,7 @@ namespace Kadr
 
         void DrawButton(Graphics g, Btn b)
         {
-            bool active = b.Cmd == Cmd.Tool && b.Tool == tool;
+            bool active = (b.Cmd == Cmd.Tool && b.Tool == tool) || (b.Cmd == Cmd.Sound && RecSys) || (b.Cmd == Cmd.Mic && RecMic);
             bool hot = hover == b;
             if (active || hot || (b.Cmd == Cmd.Color && palette))
             {
@@ -604,6 +629,16 @@ namespace Kadr
                     case Cmd.Save: Glyph(g, "", cx, cy); break;
                     case Cmd.Print: Glyph(g, "\uE749", cx, cy); break;
                     case Cmd.Close: Glyph(g, "", cx, cy); break;
+                    case Cmd.Record:
+                        float d2 = 13 * k, rx = b.R.X + Sc(17);
+                        using (var rb = new SolidBrush(Color.FromArgb(229, 57, 53))) g.FillEllipse(rb, rx - d2 / 2, cy - d2 / 2, d2, d2);
+                        TextRenderer.DrawText(g, L.T("Записать"), uiFont, new Rectangle(b.R.X + Sc(30), b.R.Y, b.R.Width - Sc(30), b.R.Height), Ink, TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.NoPrefix);
+                        break;
+                    case Cmd.Sound: Glyph(g, RecSys ? "" : "", cx, cy, RecSys ? Ink : Color.FromArgb(150, 150, 150)); break;
+                    case Cmd.Mic:
+                        Glyph(g, "", cx, cy, RecMic ? Ink : Color.FromArgb(150, 150, 150));
+                        if (!RecMic) using (var sp = new Pen(Color.FromArgb(150, 150, 150), Math.Max(1.5f, 1.6f * k))) g.DrawLine(sp, cx - u, cy - u, cx + u, cy + u);
+                        break;
                 }
             }
         }
@@ -1004,6 +1039,9 @@ namespace Kadr
                 case Cmd.Save: Finish("save", null); return;
                 case Cmd.Print: Finish("print", null); return;
                 case Cmd.Close: Cancel(); return;
+                case Cmd.Record: Record(); return;
+                case Cmd.Sound: RecSys = !RecSys; S.VideoSysAudio = RecSys; break;
+                case Cmd.Mic: RecMic = !RecMic; S.VideoMic = RecMic; break;
             }
             Refresh2();
         }
@@ -1031,8 +1069,17 @@ namespace Kadr
             Close();
         }
 
+        void Record()
+        {
+            if (!hasSel) return;
+            RecordArea = new Rectangle(sel.X + vs.X, sel.Y + vs.Y, sel.Width, sel.Height);
+            Action = "record";
+            Close();
+        }
+
         void Finish(string action, string dest)
         {
+            if (video) { Record(); return; }
             CommitText();
             if (!hasSel) return;
             Output = Render();
@@ -1095,6 +1142,7 @@ namespace Kadr
             }
 
             common:
+            if (video && ctrl && code != Keys.A) return code == Keys.C || code == Keys.S || code == Keys.P || code == Keys.D || code == Keys.Z;
             if (ctrl)
             {
                 switch (code)
@@ -1125,7 +1173,7 @@ namespace Kadr
                     Refresh2();
                     return true;
             }
-            if (!ctrl && hasSel)
+            if (!ctrl && hasSel && !video)
             {
                 Tool t = Tool.None; bool hit = true;
                 switch (code)
@@ -1188,6 +1236,14 @@ namespace Kadr
         {
             mouse = m;
             hoverWin = wins.FirstOrDefault(r => r.Contains(m));
+        }
+
+        public void TestSelect(Rectangle r)
+        {
+            sel = r;
+            hasSel = true;
+            Layout2();
+            hover = btns.FirstOrDefault(b => b.Cmd == Cmd.Record);
         }
 
         public int WindowCount { get { return wins.Count; } }

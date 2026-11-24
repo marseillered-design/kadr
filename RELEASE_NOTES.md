@@ -1,5 +1,7 @@
 **Kadr** — screenshots for Windows, macOS and Linux with drawing tools and upload to Catbox, Imgur or your own service.
 
+**New: screen recording on Windows.** Shift+PageDown → select an area → Record. Computer sound and microphone (each can be switched off), pause, stop, discard; MP4 is saved to Videos\Kadr and can be uploaded from the notice. Installed copies update themselves.
+
 | System | Download |
 |---|---|
 | Windows 10/11 | `Kadr-Setup-Windows.exe` (or `Kadr.exe`, no installation) |

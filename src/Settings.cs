@@ -97,6 +97,14 @@ namespace Kadr
         /// <summary>Encrypted for this Windows user (DPAPI), base64.</summary>
         public string ProxyPassword { get; set; }
 
+        /// <summary>Starts and stops a screen recording (Keys value like Hotkey).</summary>
+        public int VideoHotkey { get; set; }
+        public bool VideoSysAudio { get; set; }
+        public bool VideoMic { get; set; }
+        /// <summary>15, 30 or 60 frames per second.</summary>
+        public int VideoFps { get; set; }
+        public string VideoFolder { get; set; }
+
         public bool Jpeg { get { return ImageFormat == "jpg"; } }
         public string Ext { get { return Jpeg ? ".jpg" : ".png"; } }
 
@@ -125,6 +133,11 @@ namespace Kadr
             ProxyAddress = "";
             ProxyUser = "";
             ProxyPassword = "";
+            VideoHotkey = (int)(Keys.Shift | Keys.PageDown);
+            VideoSysAudio = true;
+            VideoMic = false;
+            VideoFps = 30;
+            VideoFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), L.T("Кадр"));
         }
 
         public static string Dir
@@ -162,6 +175,11 @@ namespace Kadr
                     if (s.ProxyMode != "none" && s.ProxyMode != "custom") s.ProxyMode = "system";
                     if (!raw.Contains("\"ShowNotifications\"")) s.ShowNotifications = true;
                     if (!raw.Contains("\"AutoUpdate\"")) s.AutoUpdate = true;
+                    var d = new Settings();
+                    if (!raw.Contains("\"VideoHotkey\"")) { s.VideoHotkey = d.VideoHotkey; s.VideoSysAudio = true; s.VideoFps = 30; }
+                    if (!HotkeyAllowed(s.VideoHotkey) || s.VideoHotkey == s.Hotkey) s.VideoHotkey = s.Hotkey == d.VideoHotkey ? d.Hotkey : d.VideoHotkey;
+                    if (s.VideoFps != 15 && s.VideoFps != 60) s.VideoFps = 30;
+                    if (string.IsNullOrEmpty(s.VideoFolder)) s.VideoFolder = d.VideoFolder;
                     Uploader.Configure(s);
                     return s;
                 }
