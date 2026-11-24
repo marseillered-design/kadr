@@ -156,7 +156,7 @@ namespace Kadr
             Lay.Row(up, Lay.Label("Imgur Client ID:"), Lay.Flow(imgurId, howTo));
             copyLink = Lay.Check(L.T("Копировать ссылку после загрузки"), s.CopyLink);
             openBrowser = Lay.Check(L.T("Открывать ссылку в браузере"), s.OpenInBrowser);
-            Lay.Row(up, new Label(), Lay.Hint(L.T("Catbox работает без регистрации, ссылки вечные. Для Imgur нужен Client ID."), 300));
+            Lay.Row(up, new Label(), Lay.Hint(Uploader.BuiltInImgurId.Length > 0 ? L.T("Catbox и Imgur работают сразу. Свой Client ID для Imgur — по желанию.") : L.T("Catbox работает без регистрации, ссылки вечные. Для Imgur нужен Client ID."), 300));
             Lay.Row(up, copyLink);
             Lay.Row(up, openBrowser);
             left.Controls.Add(Lay.Group(L.T("Загрузка"), up));
@@ -660,7 +660,7 @@ namespace Kadr
                 if (MessageBox.Show(this, L.T("Удалить картинку с Imgur? Ссылка перестанет открываться.") + "\n\n" + it.Url, L.T("Кадр"), MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
                 try
                 {
-                    await Uploader.ImgurDelete(S.ImgurClientId, it.ImgurDeleteHash);
+                    await Uploader.ImgurDelete(Uploader.ImgurId(S), it.ImgurDeleteHash);
                     RemoveSelected();
                     MessageBox.Show(this, L.T("Удалено с Imgur."), L.T("Кадр"));
                 }

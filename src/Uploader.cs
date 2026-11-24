@@ -63,7 +63,7 @@ namespace Kadr
 
         public static Task<UploadResult> Upload(Settings s, string destination, byte[] data, string fileName, string contentType)
         {
-            if (destination == Settings.Imgur) return Imgur(s.ImgurClientId, data, fileName, contentType);
+            if (destination == Settings.Imgur) return Imgur(ImgurId(s), data, fileName, contentType);
             if (destination == Settings.Catbox) return Custom(Settings.CatboxConfig(), data, fileName, contentType);
             var u = s.Uploaders.FirstOrDefault(x => x.Name == destination);
             if (u == null) throw new UserError(L.F("Сервис «{0}» не найден в настройках.", destination));
@@ -71,6 +71,27 @@ namespace Kadr
         }
 
         // ---------- Imgur ----------
+
+        /// <summary>
+        /// The Client ID built into release builds (from the KADR_IMGUR_CLIENT_ID secret on GitHub, never in the
+        /// source), so Imgur works without any setup. A Client ID typed in Settings takes its place.
+        /// </summary>
+        public static string BuiltInImgurId
+        {
+            get
+            {
+                foreach (System.Reflection.AssemblyMetadataAttribute m in System.Reflection.Assembly.GetExecutingAssembly()
+                         .GetCustomAttributes(typeof(System.Reflection.AssemblyMetadataAttribute), false))
+                    if (m.Key == "ImgurClientId" && !string.IsNullOrWhiteSpace(m.Value)) return m.Value.Trim();
+                return "";
+            }
+        }
+
+        public static string ImgurId(Settings s)
+        {
+            return string.IsNullOrWhiteSpace(s.ImgurClientId) ? BuiltInImgurId : s.ImgurClientId.Trim();
+        }
+
 
         public static async Task<UploadResult> Imgur(string clientId, byte[] data, string fileName, string contentType)
         {

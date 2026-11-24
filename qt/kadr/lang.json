@@ -1600,5 +1600,14 @@
 "Version {0}",
 "Versión {0}",
 "Versione {0}"
+],
+"Catbox и Imgur работают сразу. Свой Client ID для Imgur — по желанию.": [
+"Catbox и Imgur работают сразу. Свой Client ID для Imgur — по желанию.",
+"Catbox і Imgur працюють одразу. Свій Client ID для Imgur — за бажанням.",
+"Catbox and Imgur work right away. Your own Imgur Client ID is optional.",
+"Catbox und Imgur funktionieren sofort. Eine eigene Imgur-Client-ID ist optional.",
+"Catbox et Imgur fonctionnent tout de suite. Votre propre Client ID Imgur est facultatif.",
+"Catbox e Imgur funcionan al instante. Tu propio Client ID de Imgur es opcional.",
+"Catbox e Imgur funzionano subito. Il tuo Client ID di Imgur è facoltativo."
 ]
 }

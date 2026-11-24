@@ -115,8 +115,22 @@ def upload(settings, destination: str, data: bytes, file_name: str) -> Result:
     raise UserError(F("Сервис «{0}» не найден в настройках.", destination))
 
 
+def builtin_imgur_id() -> str:
+    """The Client ID built into release builds (GitHub secret KADR_IMGUR_CLIENT_ID), so Imgur works without setup."""
+    try:
+        from . import __imgur__
+        return (__imgur__ or "").strip()
+    except ImportError:
+        return ""
+
+
+def imgur_id(settings) -> str:
+    """A Client ID typed in Settings wins over the built-in one."""
+    return (settings.ImgurClientId or "").strip() or builtin_imgur_id()
+
+
 def imgur(settings, data: bytes, file_name: str) -> Result:
-    cid = (settings.ImgurClientId or "").strip()
+    cid = imgur_id(settings)
     if not cid:
         raise UserError(T("Для Imgur нужен Client ID (Настройки в меню значка Кадра). Без регистрации работает Catbox: стрелка ▾ рядом с кнопкой загрузки."))
     ct = content_type(file_name)
@@ -142,7 +156,7 @@ def imgur(settings, data: bytes, file_name: str) -> Result:
 
 def imgur_delete(settings, delete_hash: str):
     r = session(settings).delete("https://api.imgur.com/3/image/" + quote(delete_hash, safe=""),
-                                 headers={"Authorization": "Client-ID " + (settings.ImgurClientId or "").strip()}, timeout=TIMEOUT)
+                                 headers={"Authorization": "Client-ID " + imgur_id(settings)}, timeout=TIMEOUT)
     if not r.ok:
         raise UserError("Imgur: " + _short(r.text, r.status_code))
 
