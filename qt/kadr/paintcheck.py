@@ -22,6 +22,7 @@ def run() -> int:
     shot = Shot(screen, QRect(0, 0, W, H), _fake_screen(W, H))
     sess = CaptureSession(s, [shot], [QRectF(200, 150, 500, 300)])
     sess.show()
+    sess.timer.stop()          # the caret blinks on a timer; the check drives _tick() itself so both pictures match
     win = sess.wins[0]
     if os.environ.get("KADR_PAINTCHECK_BREAK"):     # proves the check catches missing repaints
         sess.update_rect = lambda i, r: None
@@ -132,4 +133,7 @@ def run() -> int:
     mouse("move", 300, 300); check("idle again")
 
     print("STEPS OK" if not problems else "\n".join(problems), flush=True)
+    if problems and os.environ.get("GITHUB_ACTIONS"):
+        for pr in problems:                       # visible on the run page without opening the log
+            print(f"::error title=Repaint check::{pr}", flush=True)
     os._exit(0 if not problems else 1)
