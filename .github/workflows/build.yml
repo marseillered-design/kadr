@@ -11,6 +11,8 @@ env:
   VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v0.0.0-dev' }}
   # Imgur Client ID built into the apps; set once under Settings -> Secrets and variables -> Actions (empty = Imgur needs one in Settings)
   KADR_IMGUR_CLIENT_ID: ${{ secrets.KADR_IMGUR_CLIENT_ID }}
+  # ImgBB API key built into the apps (api.imgbb.com); empty = ImgBB asks for a key in Settings
+  KADR_IMGBB_KEY: ${{ secrets.KADR_IMGBB_KEY }}
 
 jobs:
   linux:

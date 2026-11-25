@@ -35,6 +35,7 @@ namespace Kadr
             if (args.Length >= 2 && args[0] == "--form-test") { FormTest(args[1]); return 0; }
             if (args.Length >= 3 && args[0] == "--print-test") { using (var img = Image.FromFile(args[1])) Actions.Print(img, args[2]); return 0; }
             if (args.Length >= 3 && args[0] == "--record-test") { return RecordTest(args); }
+            if (args.Length >= 3 && args[0] == "--dest-test") { return DestTest(args[1], args.Skip(2).ToArray()); }
 
             var files = args.Where(a => !a.StartsWith("--") && File.Exists(a)).ToArray();
             if (files.Length > 0)
@@ -171,6 +172,28 @@ namespace Kadr
                 (cpu.TotalProcessorTime - t0).TotalMilliseconds / (secs * 1000) * 100 / Environment.ProcessorCount * Environment.ProcessorCount);
             if (!ok) Console.WriteLine("ERROR " + r.Error);
             return ok ? 0 : 1;
+        }
+
+        /// <summary>--dest-test ImgBB file...: uploads with a fresh (unsaved) Settings; keys come from the build or KADR_* test overrides.</summary>
+        static int DestTest(string dest, string[] files)
+        {
+            var s = new Settings { ImgbbKey = Environment.GetEnvironmentVariable("KADR_TEST_KEY") ?? "" };
+            int rc = 0;
+            foreach (var f in files)
+            {
+                try
+                {
+                    var r = Uploader.Upload(s, dest, File.ReadAllBytes(f), Path.GetFileName(f), Imaging.ContentType(f)).Result;
+                    Console.WriteLine("OK " + r.Url + " del=" + r.DeleteUrl);
+                }
+                catch (Exception ex)
+                {
+                    var e = ex is AggregateException ? ex.InnerException : ex;
+                    Console.WriteLine("ERROR " + e.Message);
+                    rc = 1;
+                }
+            }
+            return rc;
         }
 
         static int UploadTest(string configPath, string imagePath)

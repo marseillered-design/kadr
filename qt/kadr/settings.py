@@ -11,6 +11,7 @@ from . import i18n
 
 IMGUR = "Imgur"
 CATBOX = "Catbox"
+IMGBB = "ImgBB"
 APP_NAME = "Kadr"
 
 
@@ -45,6 +46,7 @@ def default_hotkey() -> str:
 DEFAULTS = {
     "DefaultDestination": CATBOX,
     "ImgurClientId": "",
+    "ImgbbKey": "",
     "CopyLink": True,
     "OpenInBrowser": False,
     "AskFileName": True,
@@ -142,7 +144,7 @@ class Settings:
 
     # ---- helpers ----
     def destinations(self) -> list[str]:
-        names = [CATBOX, IMGUR]
+        names = [CATBOX, IMGUR, IMGBB]
         for u in self.Uploaders:
             if u["Name"] not in names:
                 names.append(u["Name"])

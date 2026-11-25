@@ -1933,5 +1933,86 @@
 "Arrêter et enregistrer",
 "Detener y guardar",
 "Ferma e salva"
+],
+"Для ImgBB нужен API-ключ (Настройки → «Где его взять?»). Без ключа работает Catbox: стрелка ▾ рядом с кнопкой загрузки.": [
+"Для ImgBB нужен API-ключ (Настройки → «Где его взять?»). Без ключа работает Catbox: стрелка ▾ рядом с кнопкой загрузки.",
+"Для ImgBB потрібен API-ключ (Налаштування → «Де його взяти?»). Без ключа працює Catbox: стрілка ▾ біля кнопки завантаження.",
+"ImgBB needs an API key (Settings → “Where do I get it?”). Catbox works without one: the ▾ arrow next to the upload button.",
+"ImgBB braucht einen API-Schlüssel (Einstellungen → „Wo bekomme ich sie?“). Catbox geht ohne: Pfeil ▾ neben der Upload-Taste.",
+"ImgBB demande une clé API (Paramètres → « Où l’obtenir ? »). Catbox fonctionne sans : flèche ▾ à côté du bouton d’envoi.",
+"ImgBB necesita una clave API (Ajustes → «¿Dónde conseguirlo?»). Catbox funciona sin ella: flecha ▾ junto al botón de subir.",
+"ImgBB richiede una chiave API (Impostazioni → «Dove ottenerlo?»). Catbox funziona senza: freccia ▾ accanto al pulsante di caricamento."
+],
+"ImgBB принимает только картинки. Видео загрузи в Catbox.": [
+"ImgBB принимает только картинки. Видео загрузи в Catbox.",
+"ImgBB приймає лише картинки. Відео завантаж у Catbox.",
+"ImgBB only takes pictures. Upload videos to Catbox.",
+"ImgBB nimmt nur Bilder an. Lade Videos zu Catbox hoch.",
+"ImgBB n’accepte que les images. Envoyez les vidéos sur Catbox.",
+"ImgBB solo acepta imágenes. Sube los vídeos a Catbox.",
+"ImgBB accetta solo immagini. Carica i video su Catbox."
+],
+"ImgBB принимает картинки до 32 МБ.": [
+"ImgBB принимает картинки до 32 МБ.",
+"ImgBB приймає картинки до 32 МБ.",
+"ImgBB takes pictures up to 32 MB.",
+"ImgBB nimmt Bilder bis 32 MB an.",
+"ImgBB accepte les images jusqu’à 32 Mo.",
+"ImgBB acepta imágenes de hasta 32 MB.",
+"ImgBB accetta immagini fino a 32 MB."
+],
+"ImgBB не принял API-ключ. Проверь его в настройках.": [
+"ImgBB не принял API-ключ. Проверь его в настройках.",
+"ImgBB не прийняв API-ключ. Перевір його в налаштуваннях.",
+"ImgBB did not accept the API key. Check it in Settings.",
+"ImgBB hat den API-Schlüssel nicht akzeptiert. Prüfe ihn in den Einstellungen.",
+"ImgBB n’a pas accepté la clé API. Vérifiez-la dans les paramètres.",
+"ImgBB no aceptó la clave API. Revísala en Ajustes.",
+"ImgBB non ha accettato la chiave API. Controllala nelle Impostazioni."
+],
+"ImgBB просит подождать: слишком много загрузок. Попробуй позже.": [
+"ImgBB просит подождать: слишком много загрузок. Попробуй позже.",
+"ImgBB просить зачекати: забагато завантажень. Спробуй пізніше.",
+"ImgBB asks to wait: too many uploads. Try again later.",
+"ImgBB bittet um Geduld: zu viele Uploads. Versuche es später.",
+"ImgBB demande de patienter : trop d’envois. Réessayez plus tard.",
+"ImgBB pide esperar: demasiadas subidas. Inténtalo más tarde.",
+"ImgBB chiede di attendere: troppi caricamenti. Riprova più tardi."
+],
+"Ключ ImgBB:": [
+"Ключ ImgBB:",
+"Ключ ImgBB:",
+"ImgBB key:",
+"ImgBB-Schlüssel:",
+"Clé ImgBB :",
+"Clave de ImgBB:",
+"Chiave ImgBB:"
+],
+"Как получить ключ ImgBB": [
+"Как получить ключ ImgBB",
+"Як отримати ключ ImgBB",
+"How to get an ImgBB key",
+"So bekommst du einen ImgBB-Schlüssel",
+"Obtenir une clé ImgBB",
+"Cómo conseguir una clave de ImgBB",
+"Come ottenere una chiave ImgBB"
+],
+"ImgBB тоже работает сразу; свой ключ — по желанию.": [
+"ImgBB тоже работает сразу; свой ключ — по желанию.",
+"ImgBB теж працює одразу; свій ключ — за бажанням.",
+"ImgBB works right away too; your own key is optional.",
+"ImgBB funktioniert ebenfalls sofort; ein eigener Schlüssel ist optional.",
+"ImgBB fonctionne aussi tout de suite ; votre propre clé est facultative.",
+"ImgBB también funciona al instante; tu propia clave es opcional.",
+"Anche ImgBB funziona subito; la tua chiave è facoltativa."
+],
+"imgbb.help": [
+"ImgBB выдаёт бесплатный ключ за минуту:\n\n1. Открой api.imgbb.com (сейчас откроется).\n2. Нажми «Get API key» и войди: почта, Google или Facebook.\n3. Скопируй ключ и вставь его в поле «Ключ ImgBB».\n\nКартинки до 32 МБ, ссылка ведёт прямо на картинку (i.ibb.co/…). Удалить картинку можно из «Истории загрузок».",
+"ImgBB видає безкоштовний ключ за хвилину:\n\n1. Відкрий api.imgbb.com (зараз відкриється).\n2. Натисни «Get API key» і увійди: пошта, Google або Facebook.\n3. Скопіюй ключ і встав його в поле «Ключ ImgBB».\n\nКартинки до 32 МБ, посилання веде прямо на картинку (i.ibb.co/…). Видалити картинку можна з «Історії завантажень».",
+"ImgBB gives out a free key in a minute:\n\n1. Open api.imgbb.com (it opens now).\n2. Click “Get API key” and sign in with e-mail, Google or Facebook.\n3. Copy the key into the “ImgBB key” box.\n\nPictures up to 32 MB; the link points straight at the picture (i.ibb.co/…). You can delete it from the upload history.",
+"ImgBB vergibt in einer Minute einen kostenlosen Schlüssel:\n\n1. api.imgbb.com öffnen (öffnet sich gleich).\n2. Auf „Get API key“ klicken und mit E-Mail, Google oder Facebook anmelden.\n3. Den Schlüssel in das Feld „ImgBB-Schlüssel“ kopieren.\n\nBilder bis 32 MB; der Link führt direkt zum Bild (i.ibb.co/…). Löschen kannst du es im Upload-Verlauf.",
+"ImgBB fournit une clé gratuite en une minute :\n\n1. Ouvrez api.imgbb.com (la page s’ouvre maintenant).\n2. Cliquez sur « Get API key » et connectez-vous par e-mail, Google ou Facebook.\n3. Copiez la clé dans le champ « Clé ImgBB ».\n\nImages jusqu’à 32 Mo ; le lien mène directement à l’image (i.ibb.co/…). Vous pouvez la supprimer depuis l’historique des envois.",
+"ImgBB da una clave gratuita en un minuto:\n\n1. Abre api.imgbb.com (se abrirá ahora).\n2. Pulsa «Get API key» e inicia sesión con correo, Google o Facebook.\n3. Copia la clave en el campo «Clave de ImgBB».\n\nImágenes de hasta 32 MB; el enlace lleva directamente a la imagen (i.ibb.co/…). Puedes borrarla desde el historial de subidas.",
+"ImgBB fornisce una chiave gratuita in un minuto:\n\n1. Apri api.imgbb.com (si apre ora).\n2. Fai clic su «Get API key» e accedi con email, Google o Facebook.\n3. Copia la chiave nel campo «Chiave ImgBB».\n\nImmagini fino a 32 MB; il link porta direttamente all’immagine (i.ibb.co/…). Puoi eliminarla dalla cronologia dei caricamenti."
 ]
 }

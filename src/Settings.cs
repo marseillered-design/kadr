@@ -59,6 +59,7 @@ namespace Kadr
     {
         public const string Imgur = "Imgur";
         public const string Catbox = "Catbox";
+        public const string ImgBB = "ImgBB";
 
         /// <summary>catbox.moe: free, no account or key, permanent links; the reply is the bare link.</summary>
         public static CustomUploader CatboxConfig()
@@ -70,6 +71,8 @@ namespace Kadr
 
         public string DefaultDestination { get; set; }
         public string ImgurClientId { get; set; }
+        /// <summary>ImgBB API key typed in Settings; empty = the one built into release builds.</summary>
+        public string ImgbbKey { get; set; }
         public bool CopyLink { get; set; }
         public bool OpenInBrowser { get; set; }
         public bool AskFileName { get; set; }
@@ -117,6 +120,7 @@ namespace Kadr
         {
             DefaultDestination = Catbox;
             ImgurClientId = "";
+            ImgbbKey = "";
             CopyLink = true;
             AskFileName = true;
             HookPrintScreen = true;
@@ -235,7 +239,7 @@ namespace Kadr
 
         public List<string> Destinations()
         {
-            var list = new List<string> { Catbox, Imgur };
+            var list = new List<string> { Catbox, Imgur, ImgBB };
             foreach (var u in Uploaders) if (!list.Contains(u.Name)) list.Add(u.Name);
             return list;
         }

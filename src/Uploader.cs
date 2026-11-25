@@ -65,6 +65,7 @@ namespace Kadr
         {
             if (destination == Settings.Imgur) return Imgur(ImgurId(s), data, fileName, contentType);
             if (destination == Settings.Catbox) return Custom(Settings.CatboxConfig(), data, fileName, contentType);
+            if (destination == Settings.ImgBB) return Imgbb(ImgbbKey(s), data, fileName, contentType);
             var u = s.Uploaders.FirstOrDefault(x => x.Name == destination);
             if (u == null) throw new UserError(L.F("Сервис «{0}» не найден в настройках.", destination));
             return Custom(u, data, fileName, contentType);
@@ -90,6 +91,64 @@ namespace Kadr
         public static string ImgurId(Settings s)
         {
             return string.IsNullOrWhiteSpace(s.ImgurClientId) ? BuiltInImgurId : s.ImgurClientId.Trim();
+        }
+
+        // ---------- ImgBB ----------
+
+        /// <summary>The ImgBB key built into release builds (GitHub secret KADR_IMGBB_KEY, never in the source).</summary>
+        public static string BuiltInImgbbKey { get { return Meta("ImgbbKey"); } }
+
+        public static string ImgbbKey(Settings s)
+        {
+            return string.IsNullOrWhiteSpace(s.ImgbbKey) ? BuiltInImgbbKey : s.ImgbbKey.Trim();
+        }
+
+        static string Meta(string key)
+        {
+            foreach (System.Reflection.AssemblyMetadataAttribute m in System.Reflection.Assembly.GetExecutingAssembly()
+                     .GetCustomAttributes(typeof(System.Reflection.AssemblyMetadataAttribute), false))
+                if (m.Key == key && !string.IsNullOrWhiteSpace(m.Value)) return m.Value.Trim();
+            return "";
+        }
+
+        /// <summary>
+        /// api.imgbb.com: pictures up to 32 MB, no videos. The link is the picture itself (i.ibb.co/…),
+        /// the delete link opens ImgBB's own deletion page.
+        /// </summary>
+        public static async Task<UploadResult> Imgbb(string key, byte[] data, string fileName, string contentType)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+                throw new UserError(L.T("Для ImgBB нужен API-ключ (Настройки → «Где его взять?»). Без ключа работает Catbox: стрелка ▾ рядом с кнопкой загрузки."));
+            if (contentType.StartsWith("video/"))
+                throw new UserError(L.T("ImgBB принимает только картинки. Видео загрузи в Catbox."));
+            if (data.Length > 32 * 1024 * 1024)
+                throw new UserError(L.T("ImgBB принимает картинки до 32 МБ."));
+
+            var form = new MultipartFormDataContent();
+            var file = new ByteArrayContent(data);
+            file.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+            AddFile(form, file, "image", fileName);
+            var name = new StringContent(System.IO.Path.GetFileNameWithoutExtension(SafeName(fileName)));
+            name.Headers.ContentType = null;
+            name.Headers.ContentDisposition = new ContentDispositionHeaderValue("form-data") { Name = "\"name\"" };
+            form.Add(name);
+
+            string api = Environment.GetEnvironmentVariable("KADR_IMGBB_TEST") ?? "https://api.imgbb.com/1/upload";
+            var req = new HttpRequestMessage(HttpMethod.Post, api + "?key=" + Uri.EscapeDataString(key.Trim())) { Content = form };
+            string text; HttpStatusCode code;
+            using (var resp = await Http.SendAsync(req))
+            {
+                code = resp.StatusCode;
+                text = await resp.Content.ReadAsStringAsync();
+            }
+            object json = Json.TryParse(text);
+            string link = json == null ? null : Json.Str(json, "data.url");
+            if (!string.IsNullOrEmpty(link))
+                return new UploadResult { Url = link, DeleteUrl = Json.Str(json, "data.delete_url") };
+            string err = json == null ? null : (Json.Str(json, "error.message") ?? Json.Str(json, "status_txt"));
+            if ((int)code == 400 && err != null && err.ToLowerInvariant().Contains("key")) err = L.T("ImgBB не принял API-ключ. Проверь его в настройках.");
+            if ((int)code == 429) err = L.T("ImgBB просит подождать: слишком много загрузок. Попробуй позже.");
+            throw new UserError("ImgBB: " + (err ?? Short(text, (int)code)));
         }
 
 

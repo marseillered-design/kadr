@@ -121,7 +121,7 @@ namespace Kadr
         readonly Settings S;
         readonly List<CustomUploader> ups;
         readonly ComboBox dest;
-        readonly TextBox imgurId, folder;
+        readonly TextBox imgurId, imgbbKey, folder;
         readonly CheckBox copyLink, openBrowser, askName, hookKey, autostart, sendTo;
         readonly HotkeyBox hotkey;
         readonly ComboBox lang, format, proxyMode;
@@ -159,9 +159,14 @@ namespace Kadr
             var howTo = new LinkLabel { Text = L.T("Где его взять?"), AutoSize = true, Margin = new Padding(0, UI.S(6), 0, 0) };
             howTo.LinkClicked += (o, e) => ImgurHelp();
             Lay.Row(up, Lay.Label("Imgur Client ID:"), Lay.Flow(imgurId, howTo));
+            imgbbKey = Lay.Text(240, s.ImgbbKey);
+            var howToBB = new LinkLabel { Text = L.T("Где его взять?"), AutoSize = true, Margin = new Padding(0, UI.S(6), 0, 0) };
+            howToBB.LinkClicked += (o, e) => ImgbbHelp();
+            Lay.Row(up, Lay.Label(L.T("Ключ ImgBB:")), Lay.Flow(imgbbKey, howToBB));
             copyLink = Lay.Check(L.T("Копировать ссылку после загрузки"), s.CopyLink);
             openBrowser = Lay.Check(L.T("Открывать ссылку в браузере"), s.OpenInBrowser);
             Lay.Row(up, new Label(), Lay.Hint(Uploader.BuiltInImgurId.Length > 0 ? L.T("Catbox и Imgur работают сразу. Свой Client ID для Imgur — по желанию.") : L.T("Catbox работает без регистрации, ссылки вечные. Для Imgur нужен Client ID."), 300));
+            if (Uploader.BuiltInImgbbKey.Length > 0) Lay.Row(up, new Label(), Lay.Hint(L.T("ImgBB тоже работает сразу; свой ключ — по желанию."), 300));
             Lay.Row(up, copyLink);
             Lay.Row(up, openBrowser);
             left.Controls.Add(Lay.Group(L.T("Загрузка"), up));
@@ -276,6 +281,7 @@ namespace Kadr
             dest.Items.Clear();
             dest.Items.Add(Settings.Catbox);
             dest.Items.Add(Settings.Imgur);
+            dest.Items.Add(Settings.ImgBB);
             foreach (var u in ups) if (!dest.Items.Contains(u.Name)) dest.Items.Add(u.Name);
             dest.SelectedItem = dest.Items.Contains(selectedDest) ? selectedDest : Settings.Catbox;
         }
@@ -347,7 +353,7 @@ namespace Kadr
         string UniqueName(string name, int except = -1)
         {
             string n = string.IsNullOrWhiteSpace(name) ? L.T("Мой сервис") : name.Trim();
-            if (n == Settings.Imgur || n == Settings.Catbox) n += L.T(" (свой)");
+            if (n == Settings.Imgur || n == Settings.Catbox || n == Settings.ImgBB) n += L.T(" (свой)");
             string candidate = n;
             int k = 2;
             while (ups.Where((u, i) => i != except).Any(u => u.Name == candidate)) candidate = n + " " + k++;
@@ -364,6 +370,12 @@ namespace Kadr
         {
             using (var d = new FolderBrowserDialog { SelectedPath = vFolder.Text, Description = L.T("Куда сохранять видео") })
                 if (d.ShowDialog(this) == DialogResult.OK) vFolder.Text = d.SelectedPath;
+        }
+
+        void ImgbbHelp()
+        {
+            MessageBox.Show(this, L.T("imgbb.help"), L.T("Как получить ключ ImgBB"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+            Shell.Open("https://api.imgbb.com/");
         }
 
         void ImgurHelp()
@@ -418,6 +430,7 @@ namespace Kadr
             S.Language = code;
             L.Current = code;
             S.ImgurClientId = imgurId.Text.Trim();
+            S.ImgbbKey = imgbbKey.Text.Trim();
             S.CopyLink = copyLink.Checked;
             S.OpenInBrowser = openBrowser.Checked;
             S.AskFileName = askName.Checked;

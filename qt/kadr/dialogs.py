@@ -61,6 +61,13 @@ class SettingsDialog(QDialog):
         row.addWidget(self.imgur, 1)
         row.addWidget(how)
         f.addRow("Imgur Client ID:", row)
+        self.imgbb = QLineEdit(s.data.get("ImgbbKey", ""))
+        how_bb = QLabel(f'<a href="#">{T("Где его взять?")}</a>')
+        how_bb.linkActivated.connect(lambda _: self.imgbb_help())
+        row = QHBoxLayout()
+        row.addWidget(self.imgbb, 1)
+        row.addWidget(how_bb)
+        f.addRow(T("Ключ ImgBB:"), row)
         f.addRow("", hint(T("Catbox и Imgur работают сразу. Свой Client ID для Imgur — по желанию.") if uploader.builtin_imgur_id()
                           else T("Catbox работает без регистрации, ссылки вечные. Для Imgur нужен Client ID.")))
         self.copy_link = QCheckBox(T("Копировать ссылку после загрузки"))
@@ -213,13 +220,13 @@ class SettingsDialog(QDialog):
             host = uploader.urlparse(u.get("RequestURL") or "").hostname or T("адрес не указан")
             self.list.addItem(f"{u['Name']}   —   {host}")
         self.dest.clear()
-        names = [st.CATBOX, st.IMGUR] + [u["Name"] for u in self.ups if u["Name"] not in (st.CATBOX, st.IMGUR)]
+        names = [st.CATBOX, st.IMGUR, st.IMGBB] + [u["Name"] for u in self.ups if u["Name"] not in (st.CATBOX, st.IMGUR, st.IMGBB)]
         self.dest.addItems(names)
         self.dest.setCurrentText(selected if selected in names else st.CATBOX)
 
     def unique_name(self, name, except_index=-1):
         n = (name or "").strip() or T("Мой сервис")
-        if n in (st.IMGUR, st.CATBOX):
+        if n in (st.IMGUR, st.CATBOX, st.IMGBB):
             n += T(" (свой)")
         cand, k = n, 2
         while any(u["Name"] == cand for i, u in enumerate(self.ups) if i != except_index):
@@ -280,6 +287,10 @@ class SettingsDialog(QDialog):
         if d:
             self.folder.setText(d)
 
+    def imgbb_help(self):
+        QMessageBox.information(self, T("Как получить ключ ImgBB"), T("imgbb.help"))
+        platform_utils.open_url("https://api.imgbb.com/")
+
     def imgur_help(self):
         QMessageBox.information(self, T("Как получить Imgur Client ID"), T("imgur.help").replace("«Кадр»", "«Kadr»"))
         platform_utils.open_url("https://api.imgur.com/oauth2/addclient")
@@ -293,7 +304,7 @@ class SettingsDialog(QDialog):
         code = i18n.CODES[max(0, self.lang.currentIndex())]
         self.language_changed = code != i18n.current()
         keys = self.keys.keySequence().toString(QKeySequence.SequenceFormat.PortableText)
-        s.set(ImgurClientId=self.imgur.text().strip(), CopyLink=self.copy_link.isChecked(),
+        s.set(ImgurClientId=self.imgur.text().strip(), ImgbbKey=self.imgbb.text().strip(), CopyLink=self.copy_link.isChecked(),
               OpenInBrowser=self.open_browser.isChecked(), AskFileName=self.ask_name.isChecked(),
               SaveFolder=self.folder.text().strip() or s.SaveFolder, HookPrintScreen=self.hook.isChecked(),
               Hotkey=keys or s.Hotkey, Uploaders=self.ups, DefaultDestination=self.dest.currentText(),

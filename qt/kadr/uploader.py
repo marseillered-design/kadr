@@ -1,5 +1,6 @@
 """Uploads: Catbox, Imgur and any HTTP service (ShareX .sxcu compatible)."""
 import json
+import os
 import re
 import unicodedata
 from urllib.parse import quote, urlparse
@@ -8,7 +9,7 @@ import requests
 
 from . import i18n
 from .i18n import T, F
-from .settings import CATBOX, IMGUR
+from .settings import CATBOX, IMGBB, IMGUR
 
 TIMEOUT = 120
 UA = "Kadr/1.0"
@@ -109,6 +110,8 @@ def upload(settings, destination: str, data: bytes, file_name: str) -> Result:
         return imgur(settings, data, file_name)
     if destination == CATBOX:
         return custom(settings, catbox_config(), data, file_name)
+    if destination == IMGBB:
+        return imgbb(settings, data, file_name)
     for u in settings.Uploaders:
         if u["Name"] == destination:
             return custom(settings, u, data, file_name)
@@ -152,6 +155,48 @@ def imgur(settings, data: bytes, file_name: str) -> Result:
     elif r.status_code in (401, 403):
         err = F("Imgur не принял Client ID ({0}). Проверь его в настройках.", err or T("доступ запрещён"))
     raise UserError("Imgur: " + (str(err) if err else _short(r.text, r.status_code)))
+
+
+def builtin_imgbb_key() -> str:
+    """The ImgBB key built into release builds (GitHub secret KADR_IMGBB_KEY)."""
+    try:
+        from . import __imgbb__
+        return (__imgbb__ or "").strip()
+    except ImportError:
+        return ""
+
+
+def imgbb_key(settings) -> str:
+    return (settings.data.get("ImgbbKey") or "").strip() or builtin_imgbb_key()
+
+
+def imgbb(settings, data: bytes, file_name: str) -> Result:
+    """api.imgbb.com: pictures up to 32 MB, no videos; the link is the picture itself (i.ibb.co/...)."""
+    key = imgbb_key(settings)
+    if not key:
+        raise UserError(T("Для ImgBB нужен API-ключ (Настройки → «Где его взять?»). Без ключа работает Catbox: стрелка ▾ рядом с кнопкой загрузки."))
+    ct = content_type(file_name)
+    if ct.startswith("video/"):
+        raise UserError(T("ImgBB принимает только картинки. Видео загрузи в Catbox."))
+    if len(data) > 32 * 1024 * 1024:
+        raise UserError(T("ImgBB принимает картинки до 32 МБ."))
+    api = os.environ.get("KADR_IMGBB_TEST") or "https://api.imgbb.com/1/upload"
+    safe = safe_name(file_name)
+    r = session(settings).post(api, params={"key": key}, files={"image": (safe, data, ct)},
+                               data={"name": safe.rsplit(".", 1)[0]}, timeout=TIMEOUT)
+    try:
+        j = r.json()
+    except Exception:
+        j = None
+    link = json_path(j, "data.url") if j else None
+    if link:
+        return Result(link, delete_url=json_path(j, "data.delete_url"))
+    err = (json_path(j, "error.message") or json_path(j, "status_txt")) if j else None
+    if r.status_code == 400 and err and "key" in str(err).lower():
+        err = T("ImgBB не принял API-ключ. Проверь его в настройках.")
+    if r.status_code == 429:
+        err = T("ImgBB просит подождать: слишком много загрузок. Попробуй позже.")
+    raise UserError("ImgBB: " + (str(err) if err else _short(r.text, r.status_code)))
 
 
 def imgur_delete(settings, delete_hash: str):

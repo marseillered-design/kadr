@@ -11,7 +11,8 @@ $ver = if ($env:VERSION) { $env:VERSION.TrimStart("v") } else { "0.0.0-dev" }
 $verFile = Join-Path $env:TEMP "kadr-version.cs"
 $repo = if ($env:GITHUB_REPOSITORY) { $env:GITHUB_REPOSITORY } else { "marseillered-design/kadr" }   # where updates come from
 $imgur = if ($env:KADR_IMGUR_CLIENT_ID) { $env:KADR_IMGUR_CLIENT_ID.Trim() } else { "" }   # GitHub secret; empty in local builds
-"[assembly: System.Reflection.AssemblyInformationalVersion(`"$ver`")]", "[assembly: System.Reflection.AssemblyMetadata(`"Repo`", `"$repo`")]", "[assembly: System.Reflection.AssemblyMetadata(`"ImgurClientId`", `"$imgur`")]" | Set-Content $verFile -Encoding UTF8
+$imgbb = if ($env:KADR_IMGBB_KEY) { $env:KADR_IMGBB_KEY.Trim() } else { "" }                 # GitHub secret too
+"[assembly: System.Reflection.AssemblyInformationalVersion(`"$ver`")]", "[assembly: System.Reflection.AssemblyMetadata(`"Repo`", `"$repo`")]", "[assembly: System.Reflection.AssemblyMetadata(`"ImgurClientId`", `"$imgur`")]", "[assembly: System.Reflection.AssemblyMetadata(`"ImgbbKey`", `"$imgbb`")]" | Set-Content $verFile -Encoding UTF8
 $src += $verFile
 $ico = "$root\icons\kadr.ico"
 $common = @("/nologo", "/codepage:65001", "/optimize+", "/platform:anycpu", "/win32manifest:$root\app.manifest", "/resource:$ico,Kadr.icon.ico") + $refs
