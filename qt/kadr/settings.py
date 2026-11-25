@@ -144,7 +144,9 @@ class Settings:
 
     # ---- helpers ----
     def destinations(self) -> list[str]:
-        names = [CATBOX, IMGUR, IMGBB]
+        # Imgur and ImgBB only when there is a key (built into the release, or ImgurClientId / ImgbbKey in settings.json)
+        from . import uploader
+        names = [CATBOX] + ([IMGUR] if uploader.imgur_id(self) else []) + ([IMGBB] if uploader.imgbb_key(self) else [])
         for u in self.Uploaders:
             if u["Name"] not in names:
                 names.append(u["Name"])

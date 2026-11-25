@@ -239,7 +239,10 @@ namespace Kadr
 
         public List<string> Destinations()
         {
-            var list = new List<string> { Catbox, Imgur, ImgBB };
+            // Imgur and ImgBB only when there is a key (built into the release, or ImgurClientId / ImgbbKey in settings.json)
+            var list = new List<string> { Catbox };
+            if (Uploader.ImgurId(this).Length > 0) list.Add(Imgur);
+            if (Uploader.ImgbbKey(this).Length > 0) list.Add(ImgBB);
             foreach (var u in Uploaders) if (!list.Contains(u.Name)) list.Add(u.Name);
             return list;
         }

@@ -121,7 +121,7 @@ namespace Kadr
         readonly Settings S;
         readonly List<CustomUploader> ups;
         readonly ComboBox dest;
-        readonly TextBox imgurId, imgbbKey, folder;
+        readonly TextBox folder;
         readonly CheckBox copyLink, openBrowser, askName, hookKey, autostart, sendTo;
         readonly HotkeyBox hotkey;
         readonly ComboBox lang, format, proxyMode;
@@ -155,18 +155,10 @@ namespace Kadr
             var up = Lay.Table(2);
             dest = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = UI.S(240), Margin = new Padding(0, UI.S(3), 0, UI.S(3)) };
             Lay.Row(up, Lay.Label(L.T("Куда загружать по умолчанию:")), dest);
-            imgurId = Lay.Text(240, s.ImgurClientId);
-            var howTo = new LinkLabel { Text = L.T("Где его взять?"), AutoSize = true, Margin = new Padding(0, UI.S(6), 0, 0) };
-            howTo.LinkClicked += (o, e) => ImgurHelp();
-            Lay.Row(up, Lay.Label("Imgur Client ID:"), Lay.Flow(imgurId, howTo));
-            imgbbKey = Lay.Text(240, s.ImgbbKey);
-            var howToBB = new LinkLabel { Text = L.T("Где его взять?"), AutoSize = true, Margin = new Padding(0, UI.S(6), 0, 0) };
-            howToBB.LinkClicked += (o, e) => ImgbbHelp();
-            Lay.Row(up, Lay.Label(L.T("Ключ ImgBB:")), Lay.Flow(imgbbKey, howToBB));
             copyLink = Lay.Check(L.T("Копировать ссылку после загрузки"), s.CopyLink);
             openBrowser = Lay.Check(L.T("Открывать ссылку в браузере"), s.OpenInBrowser);
-            Lay.Row(up, new Label(), Lay.Hint(Uploader.BuiltInImgurId.Length > 0 ? L.T("Catbox и Imgur работают сразу. Свой Client ID для Imgur — по желанию.") : L.T("Catbox работает без регистрации, ссылки вечные. Для Imgur нужен Client ID."), 300));
-            if (Uploader.BuiltInImgbbKey.Length > 0) Lay.Row(up, new Label(), Lay.Hint(L.T("ImgBB тоже работает сразу; свой ключ — по желанию."), 300));
+            // keys live in the build (GitHub secrets) or, for forks, in settings.json (ImgurClientId, ImgbbKey): no fields here
+            Lay.Row(up, new Label(), Lay.Hint(L.F("Работают сразу, без регистрации: {0}.", string.Join(", ", s.Destinations().Where(d => d == Settings.Catbox || d == Settings.Imgur || d == Settings.ImgBB))), 300));
             Lay.Row(up, copyLink);
             Lay.Row(up, openBrowser);
             left.Controls.Add(Lay.Group(L.T("Загрузка"), up));
@@ -279,9 +271,7 @@ namespace Kadr
             list.Items.Clear();
             foreach (var u in ups) list.Items.Add(u.Name + "   —   " + Host(u.RequestURL));
             dest.Items.Clear();
-            dest.Items.Add(Settings.Catbox);
-            dest.Items.Add(Settings.Imgur);
-            dest.Items.Add(Settings.ImgBB);
+            foreach (var d in S.Destinations().Where(d => d == Settings.Catbox || d == Settings.Imgur || d == Settings.ImgBB)) dest.Items.Add(d);
             foreach (var u in ups) if (!dest.Items.Contains(u.Name)) dest.Items.Add(u.Name);
             dest.SelectedItem = dest.Items.Contains(selectedDest) ? selectedDest : Settings.Catbox;
         }
@@ -372,19 +362,6 @@ namespace Kadr
                 if (d.ShowDialog(this) == DialogResult.OK) vFolder.Text = d.SelectedPath;
         }
 
-        void ImgbbHelp()
-        {
-            MessageBox.Show(this, L.T("imgbb.help"), L.T("Как получить ключ ImgBB"), MessageBoxButtons.OK, MessageBoxIcon.Information);
-            Shell.Open("https://api.imgbb.com/");
-        }
-
-        void ImgurHelp()
-        {
-            var text = L.T("imgur.help");
-            MessageBox.Show(this, text, L.T("Как получить Imgur Client ID"), MessageBoxButtons.OK, MessageBoxIcon.Information);
-            Shell.Open("https://api.imgur.com/oauth2/addclient");
-        }
-
         void SaveAndClose()
         {
             if (proxyMode.SelectedIndex == 2 && Uploader.ProxyUri(proxyAddr.Text) == null)
@@ -429,8 +406,6 @@ namespace Kadr
             LanguageChanged = code != L.Current;
             S.Language = code;
             L.Current = code;
-            S.ImgurClientId = imgurId.Text.Trim();
-            S.ImgbbKey = imgbbKey.Text.Trim();
             S.CopyLink = copyLink.Checked;
             S.OpenInBrowser = openBrowser.Checked;
             S.AskFileName = askName.Checked;

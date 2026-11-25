@@ -53,23 +53,9 @@ class SettingsDialog(QDialog):
         f = QFormLayout(g)
         self.dest = QComboBox()
         f.addRow(T("Куда загружать по умолчанию:"), self.dest)
-        self.imgur = QLineEdit(s.ImgurClientId)
-        self.imgur.setMinimumWidth(200)
-        how = QLabel(f'<a href="#">{T("Где его взять?")}</a>')
-        how.linkActivated.connect(lambda _: self.imgur_help())
-        row = QHBoxLayout()
-        row.addWidget(self.imgur, 1)
-        row.addWidget(how)
-        f.addRow("Imgur Client ID:", row)
-        self.imgbb = QLineEdit(s.data.get("ImgbbKey", ""))
-        how_bb = QLabel(f'<a href="#">{T("Где его взять?")}</a>')
-        how_bb.linkActivated.connect(lambda _: self.imgbb_help())
-        row = QHBoxLayout()
-        row.addWidget(self.imgbb, 1)
-        row.addWidget(how_bb)
-        f.addRow(T("Ключ ImgBB:"), row)
-        f.addRow("", hint(T("Catbox и Imgur работают сразу. Свой Client ID для Imgur — по желанию.") if uploader.builtin_imgur_id()
-                          else T("Catbox работает без регистрации, ссылки вечные. Для Imgur нужен Client ID.")))
+        # keys live in the build (GitHub secrets) or, for forks, in settings.json (ImgurClientId, ImgbbKey): no fields here
+        ready = [d for d in s.destinations() if d in (st.CATBOX, st.IMGUR, st.IMGBB)]
+        f.addRow("", hint(F("Работают сразу, без регистрации: {0}.", ", ".join(ready))))
         self.copy_link = QCheckBox(T("Копировать ссылку после загрузки"))
         self.copy_link.setChecked(s.CopyLink)
         self.open_browser = QCheckBox(T("Открывать ссылку в браузере"))
@@ -220,7 +206,8 @@ class SettingsDialog(QDialog):
             host = uploader.urlparse(u.get("RequestURL") or "").hostname or T("адрес не указан")
             self.list.addItem(f"{u['Name']}   —   {host}")
         self.dest.clear()
-        names = [st.CATBOX, st.IMGUR, st.IMGBB] + [u["Name"] for u in self.ups if u["Name"] not in (st.CATBOX, st.IMGUR, st.IMGBB)]
+        names = [d for d in self.S.destinations() if d in (st.CATBOX, st.IMGUR, st.IMGBB)]
+        names += [u["Name"] for u in self.ups if u["Name"] not in (st.CATBOX, st.IMGUR, st.IMGBB)]
         self.dest.addItems(names)
         self.dest.setCurrentText(selected if selected in names else st.CATBOX)
 
@@ -287,14 +274,6 @@ class SettingsDialog(QDialog):
         if d:
             self.folder.setText(d)
 
-    def imgbb_help(self):
-        QMessageBox.information(self, T("Как получить ключ ImgBB"), T("imgbb.help"))
-        platform_utils.open_url("https://api.imgbb.com/")
-
-    def imgur_help(self):
-        QMessageBox.information(self, T("Как получить Imgur Client ID"), T("imgur.help").replace("«Кадр»", "«Kadr»"))
-        platform_utils.open_url("https://api.imgur.com/oauth2/addclient")
-
     def save_and_close(self):
         if self.proxy_mode.currentIndex() == 2 and not uploader.proxy_url(self.proxy_addr.text()):
             QMessageBox.warning(self, T("Кадр"), T("Адрес прокси не похож на настоящий. Пример: 192.168.1.10:8080"))
@@ -304,7 +283,7 @@ class SettingsDialog(QDialog):
         code = i18n.CODES[max(0, self.lang.currentIndex())]
         self.language_changed = code != i18n.current()
         keys = self.keys.keySequence().toString(QKeySequence.SequenceFormat.PortableText)
-        s.set(ImgurClientId=self.imgur.text().strip(), ImgbbKey=self.imgbb.text().strip(), CopyLink=self.copy_link.isChecked(),
+        s.set(CopyLink=self.copy_link.isChecked(),
               OpenInBrowser=self.open_browser.isChecked(), AskFileName=self.ask_name.isChecked(),
               SaveFolder=self.folder.text().strip() or s.SaveFolder, HookPrintScreen=self.hook.isChecked(),
               Hotkey=keys or s.Hotkey, Uploaders=self.ups, DefaultDestination=self.dest.currentText(),

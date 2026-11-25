@@ -46,9 +46,9 @@ Get the installer for your system from **Releases**:
 
 **Catbox** — works right away: no account, no keys, links like `files.catbox.moe/abc123.png` don’t expire. This is the default.
 
-**Imgur** — needs a free Client ID: Settings → “Where do I get it?” explains it step by step.
+**Imgur** — appears once a Client ID is built into the release (or set as `ImgurClientId` in settings.json, see [CUSTOMIZING.md](CUSTOMIZING.md)).
 
-**ImgBB** — pictures up to 32 MB, the link points straight at the picture (`i.ibb.co/…`). Release builds have a key built in; your own free key from api.imgbb.com can be typed in Settings (“Where do I get it?”). ImgBB does not take videos.
+**ImgBB** — pictures up to 32 MB, the link points straight at the picture (`i.ibb.co/…`). Works right away: the key is built into the release. ImgBB does not take videos.
 
 **Your own service** — Settings → Your own upload services → Add…: the address, the file field, and where the link is in the reply (`{json:data.url}`, `{response}`, `{regex:...}`). Ready-made ShareX `.sxcu` files can be imported as they are.
 

@@ -22,7 +22,8 @@ Fields worth knowing:
 |---|---|
 | `Palette` | The colours offered in the capture window, e.g. `["#E53935", "#00BCD4", "#FFFFFF"]` — up to 12 |
 | `PenColor`, `PenSize` | The colour and thickness the tools start with |
-| `DefaultDestination` | `Catbox`, `Imgur` or the name of your own service |
+| `DefaultDestination` | `Catbox`, `ImgBB`, `Imgur` or the name of your own service |
+| `ImgbbKey`, `ImgurClientId` | Your own ImgBB key / Imgur Client ID instead of the ones built into the release (forks and local builds have none) |
 | `Uploaders` | Your own upload services (same fields as ShareX `.sxcu` files) |
 | `SaveFolder`, `AskFileName`, `ImageFormat`, `JpegQuality` | Saving |
 | `Language` | `ru`, `uk`, `en`, `de`, `fr`, `es`, `it`; empty = the system’s language |

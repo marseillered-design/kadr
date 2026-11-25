@@ -22,7 +22,8 @@
 |---|---|
 | `Palette` | Цвета в окне снимка, например `["#E53935", "#00BCD4", "#FFFFFF"]` — до 12 штук |
 | `PenColor`, `PenSize` | С какого цвета и толщины начинают инструменты |
-| `DefaultDestination` | `Catbox`, `Imgur` или название вашего сервиса |
+| `DefaultDestination` | `Catbox`, `ImgBB`, `Imgur` или название вашего сервиса |
+| `ImgbbKey`, `ImgurClientId` | Свой ключ ImgBB / Client ID Imgur вместо встроенных в релиз (в форках и своих сборках их нет) |
 | `Uploaders` | Ваши сервисы загрузки (те же поля, что в файлах ShareX `.sxcu`) |
 | `SaveFolder`, `AskFileName`, `ImageFormat`, `JpegQuality` | Сохранение |
 | `Language` | `ru`, `uk`, `en`, `de`, `fr`, `es`, `it`; пусто — язык системы |

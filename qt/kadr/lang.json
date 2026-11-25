@@ -2014,5 +2014,14 @@
 "ImgBB fournit une clé gratuite en une minute :\n\n1. Ouvrez api.imgbb.com (la page s’ouvre maintenant).\n2. Cliquez sur « Get API key » et connectez-vous par e-mail, Google ou Facebook.\n3. Copiez la clé dans le champ « Clé ImgBB ».\n\nImages jusqu’à 32 Mo ; le lien mène directement à l’image (i.ibb.co/…). Vous pouvez la supprimer depuis l’historique des envois.",
 "ImgBB da una clave gratuita en un minuto:\n\n1. Abre api.imgbb.com (se abrirá ahora).\n2. Pulsa «Get API key» e inicia sesión con correo, Google o Facebook.\n3. Copia la clave en el campo «Clave de ImgBB».\n\nImágenes de hasta 32 MB; el enlace lleva directamente a la imagen (i.ibb.co/…). Puedes borrarla desde el historial de subidas.",
 "ImgBB fornisce una chiave gratuita in un minuto:\n\n1. Apri api.imgbb.com (si apre ora).\n2. Fai clic su «Get API key» e accedi con email, Google o Facebook.\n3. Copia la chiave nel campo «Chiave ImgBB».\n\nImmagini fino a 32 MB; il link porta direttamente all’immagine (i.ibb.co/…). Puoi eliminarla dalla cronologia dei caricamenti."
+],
+"Работают сразу, без регистрации: {0}.": [
+"Работают сразу, без регистрации: {0}.",
+"Працюють одразу, без реєстрації: {0}.",
+"Work right away, no sign-up: {0}.",
+"Funktionieren sofort, ohne Anmeldung: {0}.",
+"Fonctionnent tout de suite, sans inscription : {0}.",
+"Funcionan al instante, sin registro: {0}.",
+"Funzionano subito, senza registrazione: {0}."
 ]
 }
