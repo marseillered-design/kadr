@@ -2023,5 +2023,23 @@
 "Fonctionnent tout de suite, sans inscription : {0}.",
 "Funcionan al instante, sin registro: {0}.",
 "Funzionano subito, senza registrazione: {0}."
+],
+"Отдавать клавиши удалённому рабочему столу, когда его окно впереди": [
+"Отдавать клавиши удалённому рабочему столу, когда его окно впереди",
+"Віддавати клавіші віддаленому робочому столу, коли його вікно попереду",
+"Leave the keys to a remote desktop while its window is in front",
+"Tasten dem Remotedesktop überlassen, solange sein Fenster vorne ist",
+"Laisser les touches au bureau à distance quand sa fenêtre est au premier plan",
+"Dejar las teclas al escritorio remoto cuando su ventana esté delante",
+"Lascia i tasti al desktop remoto quando la sua finestra è in primo piano"
+],
+"RDP, AnyDesk, TeamViewer, RustDesk, виртуальные машины: снимок сделает программа на том компьютере.": [
+"RDP, AnyDesk, TeamViewer, RustDesk, виртуальные машины: снимок сделает программа на том компьютере.",
+"RDP, AnyDesk, TeamViewer, RustDesk, віртуальні машини: знімок зробить програма на тому комп’ютері.",
+"RDP, AnyDesk, TeamViewer, RustDesk, virtual machines: the screenshot tool on that computer takes the shot.",
+"RDP, AnyDesk, TeamViewer, RustDesk, virtuelle Maschinen: Das Screenshot-Programm auf jenem Computer übernimmt.",
+"RDP, AnyDesk, TeamViewer, RustDesk, machines virtuelles : c’est l’outil de capture de l’autre ordinateur qui s’en charge.",
+"RDP, AnyDesk, TeamViewer, RustDesk, máquinas virtuales: la captura la hace el programa de ese equipo.",
+"RDP, AnyDesk, TeamViewer, RustDesk, macchine virtuali: lo screenshot lo fa il programma su quel computer."
 ]
 }

@@ -127,7 +127,7 @@ namespace Kadr
         readonly ComboBox lang, format, proxyMode;
         readonly NumericUpDown quality;
         readonly TextBox proxyAddr, proxyUser, proxyPass;
-        readonly CheckBox notify, autoUpdate;
+        readonly CheckBox notify, autoUpdate, passRemote;
         readonly HotkeyBox videoKey;
         readonly CheckBox videoKeyOn;
         readonly CheckBox vSys, vMic;
@@ -247,6 +247,9 @@ namespace Kadr
             sendTo = Lay.Check(L.T("Пункт «Кадр (загрузить)» в меню «Отправить» для картинок"), Shell.SendTo);
             Lay.Row(gen, Lay.Flow(hookKey, hotkey));
             Lay.Row(gen, Lay.Hint(L.T("Щёлкни в поле и нажми нужное сочетание, например Shift+PageUp. Пока открыто это окно, сочетание не срабатывает."), 440));
+            passRemote = Lay.Check(L.T("Отдавать клавиши удалённому рабочему столу, когда его окно впереди"), s.PassKeysToRemote);
+            Lay.Row(gen, passRemote);
+            Lay.Row(gen, Lay.Hint(L.T("RDP, AnyDesk, TeamViewer, RustDesk, виртуальные машины: снимок сделает программа на том компьютере."), 440));
             Lay.Row(gen, autostart);
             Lay.Row(gen, sendTo);
             notify = Lay.Check(L.T("Показывать уведомления (об ошибках — всегда)"), s.ShowNotifications);
@@ -374,6 +377,7 @@ namespace Kadr
             S.JpegQuality = (int)quality.Value;
             S.ShowNotifications = notify.Checked;
             S.AutoUpdate = autoUpdate.Checked;
+            S.PassKeysToRemote = passRemote.Checked;
             S.ProxyMode = proxyMode.SelectedIndex == 1 ? "none" : proxyMode.SelectedIndex == 2 ? "custom" : "system";
             S.ProxyAddress = proxyAddr.Text.Trim();
             S.ProxyUser = proxyUser.Text.Trim();

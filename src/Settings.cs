@@ -104,6 +104,8 @@ namespace Kadr
         public int VideoHotkey { get; set; }
         /// <summary>Whether the recording hotkey is on (separate from the screenshot one).</summary>
         public bool VideoHotkeyOn { get; set; }
+        /// <summary>Remote desktop or virtual machine in front: let Kadr's keys through to it.</summary>
+        public bool PassKeysToRemote { get; set; }
         public bool VideoSysAudio { get; set; }
         public bool VideoMic { get; set; }
         /// <summary>15, 30 or 60 frames per second.</summary>
@@ -141,6 +143,7 @@ namespace Kadr
             ProxyPassword = "";
             VideoHotkey = (int)(Keys.Shift | Keys.PageDown);
             VideoHotkeyOn = true;
+            PassKeysToRemote = true;
             VideoSysAudio = true;
             VideoMic = false;
             VideoFps = 30;
@@ -182,6 +185,7 @@ namespace Kadr
                     if (s.ProxyMode != "none" && s.ProxyMode != "custom") s.ProxyMode = "system";
                     if (!raw.Contains("\"ShowNotifications\"")) s.ShowNotifications = true;
                     if (!raw.Contains("\"AutoUpdate\"")) s.AutoUpdate = true;
+                    if (!raw.Contains("\"PassKeysToRemote\"")) s.PassKeysToRemote = true;
                     var d = new Settings();
                     if (!raw.Contains("\"VideoHotkey\"")) { s.VideoHotkey = d.VideoHotkey; s.VideoSysAudio = true; s.VideoFps = 30; }
                     if (!HotkeyAllowed(s.VideoHotkey) || s.VideoHotkey == s.Hotkey) s.VideoHotkey = s.Hotkey == d.VideoHotkey ? d.Hotkey : d.VideoHotkey;

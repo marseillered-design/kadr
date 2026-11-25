@@ -19,6 +19,8 @@ namespace Kadr
         public event Action VideoPressed;
         public volatile int Hotkey = (int)(Keys.Shift | Keys.PageUp);
         public volatile int VideoHotkey;
+        /// <summary>Leave the keys to remote desktops and virtual machines while their window is in front.</summary>
+        public volatile bool PassToRemote = true;
         Thread thread;
         uint threadId;
         IntPtr hook;
@@ -61,6 +63,9 @@ namespace Kadr
             if (nCode >= 0)
             {
                 int vk = System.Runtime.InteropServices.Marshal.ReadInt32(lParam);
+                // one of our keys, but a remote desktop is in front: it belongs to the other computer's screenshot tool
+                if ((vk == (Hotkey & 0xFFFF) || vk == (VideoHotkey & 0xFFFF)) && PassToRemote && RemoteWindows.InFront())
+                    return Native.CallNextHookEx(hook, nCode, wParam, lParam);
                 int vh = VideoHotkey;
                 if (vh != 0 && vk == (vh & 0xFFFF))
                 {
@@ -120,6 +125,48 @@ namespace Kadr
         {
             var h = Pressed;
             if (h != null) h(shift);
+        }
+    }
+
+    /// <summary>
+    /// Remote desktop clients and virtual machine windows. While one of them is in front, Kadr's keys go through to
+    /// the other computer, so the screenshot tool there gets them (with Kadr's hook they would never arrive).
+    /// </summary>
+    static class RemoteWindows
+    {
+        static readonly HashSet<string> Names = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "mstsc", "msrdc", "msrdcw", "Windows365", "RDCMan", "mRemoteNG", "RoyalTS", "RemoteDesktopManager", "RemoteDesktopManagerFree",
+            "AnyDesk", "TeamViewer", "TeamViewer_Desktop", "rustdesk", "parsecd", "Splashtop Business", "SRServer", "strwinclt",
+            "vncviewer", "tvnviewer", "winvnc", "RealVNC", "rdpclient", "AweSun", "ToDesk", "Ammyy_Admin", "AA_v3", "LiteManager",
+            "vmconnect", "vmware", "vmware-vmx", "vmplayer", "VirtualBoxVM", "VirtualBox", "prl_client_app", "Citrix Workspace",
+            "CDViewer", "wfica32", "HPRdpClient", "nomachine", "nxplayer.bin", "nxplayer", "DWRCC", "RemotePC", "ScreenConnect.WindowsClient",
+        };
+
+        static readonly Dictionary<uint, bool> cache = new Dictionary<uint, bool>();
+
+        public static bool InFront()
+        {
+            try
+            {
+                IntPtr fg = Native.GetForegroundWindow();
+                if (fg == IntPtr.Zero) return false;
+                uint pid;
+                Native.GetWindowThreadProcessId(fg, out pid);
+                bool remote;
+                lock (cache)
+                    if (cache.TryGetValue(pid, out remote)) return remote;
+                string name = "";
+                try { using (var p = System.Diagnostics.Process.GetProcessById((int)pid)) name = p.ProcessName; } catch { }
+                remote = Names.Contains(name);
+                lock (cache)
+                {
+                    if (cache.Count > 200) cache.Clear();
+                    cache[pid] = remote;
+                }
+                return remote;
+            }
+            catch { return false; }
         }
     }
 
@@ -429,6 +476,7 @@ namespace Kadr
             // the two hotkeys are switched on and off separately; 0 = that one is off
             hook.Hotkey = S.HookPrintScreen ? S.Hotkey : 0;
             hook.VideoHotkey = S.VideoHotkeyOn ? S.VideoHotkey : 0;
+            hook.PassToRemote = S.PassKeysToRemote;
             if (S.HookPrintScreen || S.VideoHotkeyOn) hook.Start(); else hook.Stop();
             videoItem.ShortcutKeyDisplayString = S.VideoHotkeyOn ? Settings.KeyText(S.VideoHotkey) : "";
             string key = Settings.KeyText(S.Hotkey);

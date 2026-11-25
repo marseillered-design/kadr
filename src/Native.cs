@@ -32,6 +32,7 @@ namespace Kadr
         [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
         [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
         [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, IntPtr pid);
+        [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
         [DllImport("user32.dll")] public static extern bool AttachThreadInput(uint a, uint b, bool attach);
         [DllImport("user32.dll")] public static extern bool BringWindowToTop(IntPtr h);
 
