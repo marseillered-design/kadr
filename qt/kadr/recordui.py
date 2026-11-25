@@ -13,7 +13,7 @@ RED, AMBER = QColor(229, 57, 53), QColor(251, 140, 0)
 def hide_from_capture(w: QWidget):
     """macOS: the window stays visible but is left out of screen recordings (NSWindowSharingNone).
     Linux has no such switch, so the bar is placed outside the recorded area instead."""
-    if not platform_utils.MAC:
+    if not platform_utils._cocoa():   # never on the offscreen test platform: objc on its windows crashes
         return
     try:
         import objc

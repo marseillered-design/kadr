@@ -31,18 +31,18 @@ jobs:
           sudo gem install --no-document fpm
       - run: pip install -r requirements.txt pyinstaller
       - name: Self-test (draws the overlay, dialogs and notices)
-        run: QT_QPA_PLATFORM=offscreen KADR_LANG=ru python -m kadr --render-test selftest
+        run: QT_QPA_PLATFORM=offscreen KADR_LANG=ru bash tools/ci_check.sh "Self-test" python -X faulthandler -m kadr --render-test selftest
       - name: Repaint check (simulated mouse and keys, no stale areas)
         run: QT_QPA_PLATFORM=offscreen python -m kadr --paint-check
       - name: Recording check (moving picture + a tone through Qt's encoder into a video file)
-        run: QT_QPA_PLATFORM=offscreen python -m kadr --record-test rec-test.mp4 3
+        run: QT_QPA_PLATFORM=offscreen bash tools/ci_check.sh "Recording check" python -m kadr --record-test rec-test.mp4 3
       - name: Stamp the version (the updater compares it with the newest release)
         run: python tools/stamp_version.py
       - run: pyinstaller --noconfirm kadr.spec
       - name: Self-test of the built program
         run: QT_QPA_PLATFORM=offscreen KADR_LANG=uk dist/kadr/kadr --render-test selftest-built
       - name: Recording check of the built program
-        run: QT_QPA_PLATFORM=offscreen dist/kadr/kadr --record-test rec-built.mp4 3
+        run: QT_QPA_PLATFORM=offscreen bash tools/ci_check.sh "Recording check, built" dist/kadr/kadr --record-test rec-built.mp4 3
       - name: .deb and .rpm installers
         run: bash ../installer/linux/build-packages.sh "${VERSION#v}"
       - name: Check the .deb installs and starts
@@ -92,11 +92,11 @@ jobs:
         with: { python-version: "3.12" }
       - run: pip install -r requirements.txt pyinstaller pillow
       - name: Self-test (draws the overlay, dialogs and notices)
-        run: QT_QPA_PLATFORM=offscreen KADR_LANG=ru python -m kadr --render-test selftest
+        run: QT_QPA_PLATFORM=offscreen KADR_LANG=ru bash tools/ci_check.sh "Self-test" python -X faulthandler -m kadr --render-test selftest
       - name: Repaint check (simulated mouse and keys, no stale areas)
         run: QT_QPA_PLATFORM=offscreen python -m kadr --paint-check
       - name: Recording check (moving picture + a tone through Qt's encoder into a video file)
-        run: QT_QPA_PLATFORM=offscreen python -m kadr --record-test rec-test.mp4 3
+        run: QT_QPA_PLATFORM=offscreen bash tools/ci_check.sh "Recording check" python -m kadr --record-test rec-test.mp4 3
       - run: |
           python tools/stamp_version.py
           sed -i '' "s/\"CFBundleShortVersionString\": \"1.0.0\"/\"CFBundleShortVersionString\": \"${VERSION#v}\"/" kadr.spec
@@ -104,7 +104,7 @@ jobs:
       - name: Self-test of the built app
         run: QT_QPA_PLATFORM=offscreen KADR_LANG=en dist/Kadr.app/Contents/MacOS/Kadr --render-test selftest-built
       - name: Recording check of the built app
-        run: QT_QPA_PLATFORM=offscreen dist/Kadr.app/Contents/MacOS/Kadr --record-test rec-built.mp4 3
+        run: QT_QPA_PLATFORM=offscreen bash tools/ci_check.sh "Recording check, built" dist/Kadr.app/Contents/MacOS/Kadr --record-test rec-built.mp4 3
       - name: Disk image with "drag to Applications"
         run: |
           codesign --force --deep --sign - dist/Kadr.app
