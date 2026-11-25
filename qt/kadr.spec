@@ -11,9 +11,22 @@ else:
     hidden += ["jeepney", "jeepney.io.blocking", "Xlib", "Xlib.display", "Xlib.XK", "Xlib.X", "Xlib.error",
                "keyring.backends.SecretService"]
 
+# Linux: PyInstaller does not pick up Qt Multimedia's FFmpeg backend by itself (the plugin is loaded at run
+# time, and it brings its own FFmpeg libraries): add them, or the built program cannot record.
+extra_bins = []
+if not mac:
+    import glob
+    import os
+    import PySide6
+    _qt = os.path.join(os.path.dirname(PySide6.__file__), "Qt")
+    extra_bins += [(f, "PySide6/Qt/plugins/multimedia") for f in glob.glob(os.path.join(_qt, "plugins", "multimedia", "*.so"))]
+    for pat in ("libavcodec*", "libavformat*", "libavutil*", "libswresample*", "libswscale*", "libavdevice*", "libavfilter*", "libQt6FFmpegStub*"):
+        extra_bins += [(f, "PySide6/Qt/lib") for f in glob.glob(os.path.join(_qt, "lib", pat))]
+
 a = Analysis(
     ["run_kadr.py"],
     pathex=["."],
+    binaries=extra_bins,
     datas=[("kadr/lang.json", "kadr")] + [(f"../icons/kadr-{n}.png", "kadr/icons") for n in (16, 20, 24, 32, 48, 64, 128, 256, 512)],
     hiddenimports=hidden,
     excludes=["tkinter", "PySide6.QtQml", "PySide6.QtQuick", "PySide6.QtWebEngineCore", "PySide6.QtMultimediaWidgets",

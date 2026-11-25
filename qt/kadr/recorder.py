@@ -461,6 +461,10 @@ def record_test(path: str, seconds: float = 3.0, sound=True) -> int:
     f = QMediaFormat(QMediaFormat.FileFormat.MPEG4)
     print("encoders: video", [c.name for c in f.supportedVideoCodecs(QMediaFormat.ConversionMode.Encode)],
           "audio", [c.name for c in f.supportedAudioCodecs(QMediaFormat.ConversionMode.Encode)])
+    from PySide6.QtCore import QCoreApplication
+    for d in QCoreApplication.libraryPaths():
+        mm = os.path.join(d, "multimedia")
+        print("plugins:", d, "multimedia:", sorted(os.listdir(mm)) if os.path.isdir(mm) else "none")
     chosen = choose_format(sound)
     print("chosen:", chosen.fileFormat().name, chosen.videoCodec().name, chosen.audioCodec().name)
     n = [0]
