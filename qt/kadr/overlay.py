@@ -88,9 +88,13 @@ class OverlayWindow(QWidget):
 class CaptureSession(QObject):
     finished = Signal(str, object, str)   # action ("" = cancelled), QImage, destination
 
-    def __init__(self, settings, shots, windows=None, full_screen=False):
+    def __init__(self, settings, shots, windows=None, full_screen=False, video=False):
         super().__init__()
         self.S = settings
+        # video mode: choose the area to record; the bar has Record, computer sound, microphone and Close
+        self.video = video
+        self.rec_sys = bool(settings.data.get("VideoSysAudio", True))
+        self.rec_mic = bool(settings.data.get("VideoMic", False))
         self.shots = shots
         self.windows_global = windows or []
         self.color = QColor(settings.PenColor)
@@ -206,8 +210,9 @@ class CaptureSession(QObject):
         if self.has_sel:
             add(self.sel.adjusted(-12, -36, 12, 12))
             add(QRectF(self.sel.left(), self.sel.top() - 36, 220, 70))
-        if not self.tools_bar.isEmpty():
-            add(self.tools_bar.united(self.actions_bar).adjusted(-300, -50, 300, 50))
+        bars = self.actions_bar if self.tools_bar.isEmpty() else self.tools_bar.united(self.actions_bar)
+        if not bars.isEmpty():
+            add(bars.adjusted(-300, -50, 300, 50))
         if not self.palette_rect.isEmpty():
             add(self.palette_rect.adjusted(-6, -6, 6, 6))
         if self.size_tip:
@@ -240,7 +245,20 @@ class CaptureSession(QObject):
             Btn("copy", T("Копировать (Ctrl+C)")), Btn("save", T("Сохранить (Ctrl+S)")),
             Btn("print", T("Печать (Ctrl+P)")), Btn("close", T("Закрыть (Esc)")),
         ]
-        aw, ah = (len(actions) - 1) * bs + narrow + 2 * pad, bs + 2 * pad
+        if self.video:
+            tools = []
+            actions = [
+                Btn("record", T("Начать запись (Enter)")),
+                Btn("sound", T("Звук компьютера: вкл.") if self.rec_sys else T("Звук компьютера: выкл.")),
+                Btn("mic", T("Микрофон: вкл.") if self.rec_mic else T("Микрофон: выкл.")),
+                Btn("close", T("Закрыть (Esc)")),
+            ]
+        rec_w = bs + QFontMetricsF(self.ui_font).horizontalAdvance(T("Записать")) + 12
+
+        def width(b):
+            return narrow if b.cmd == "upmenu" else rec_w if b.cmd == "record" else bs
+
+        aw, ah = sum(width(b) for b in actions) + 2 * pad, bs + 2 * pad
         ax, ay = sel.right() - aw, sel.bottom() + gap
         if ay + ah > mon.bottom() - gap:
             ay = sel.top() - gap - ah
@@ -256,8 +274,8 @@ class CaptureSession(QObject):
             if tx < mon.left() + gap:
                 tx = sel.right() - tw - gap
         ty = max(mon.top() + gap, min(sel.bottom() - th, mon.bottom() - th - gap))
-        self.tools_bar = QRectF(tx, ty, tw, th)
-        if self.tools_bar.intersects(self.actions_bar):
+        self.tools_bar = QRectF(tx, ty, tw, th) if tools else QRectF()
+        if tools and self.tools_bar.intersects(self.actions_bar):
             self.tools_bar.moveTop(max(mon.top() + gap, self.actions_bar.top() - gap - th))
 
         for i, b in enumerate(tools):
@@ -266,12 +284,12 @@ class CaptureSession(QObject):
             self.btns.append(b)
         x = self.actions_bar.x() + pad
         for b in actions:
-            w = narrow if b.cmd == "upmenu" else bs
+            w = width(b)
             b.r = QRectF(x, self.actions_bar.y() + pad, w, bs)
             x += w
             self.btns.append(b)
 
-        if self.palette:
+        if self.palette and not self.video:
             cb = next(b for b in self.btns if b.cmd == "color").r
             sw = 26.0
             pw, ph = len(self.palette_colors) * sw + 2 * pad, sw + 2 * pad
@@ -330,7 +348,8 @@ class CaptureSession(QObject):
                 self.draw_hint(p, i)
 
         if self.bars_visible() and on_active:
-            self.draw_bar(p, self.tools_bar)
+            if not self.tools_bar.isEmpty():
+                self.draw_bar(p, self.tools_bar)
             self.draw_bar(p, self.actions_bar)
             for b in self.btns:
                 self.draw_button(p, b)
@@ -384,7 +403,7 @@ class CaptureSession(QObject):
         self.label(p, QRectF(self.sel.left(), y, 0, 24), f"{w} × {h}", QColor(20, 20, 20, 200))
 
     def draw_hint(self, p, i):
-        text = T("Выдели область мышью или щёлкни по окну · Esc — отмена")
+        text = T("Выдели область для видео или щёлкни по окну · Esc — отмена") if self.video else T("Выдели область мышью или щёлкни по окну · Esc — отмена")
         fm = QFontMetricsF(self.ui_font)
         w = fm.horizontalAdvance(text) + 28
         mon = self.screen_rect(i)
@@ -415,13 +434,31 @@ class CaptureSession(QObject):
         self.rounded(p, r, 8, QColor(250, 251, 252), QColor(205, 208, 214))
 
     def draw_button(self, p, b: Btn):
-        active = b.cmd == "tool" and b.tool == self.tool
+        active = (b.cmd == "tool" and b.tool == self.tool) or (b.cmd == "sound" and self.rec_sys) or (b.cmd == "mic" and self.rec_mic)
         hot = self.hover_btn is b
         if active or hot or (b.cmd == "color" and self.palette):
             self.rounded(p, b.r.adjusted(2, 2, -2, -2), 6, QColor(209, 226, 255) if active else QColor(232, 236, 242))
+        if b.cmd == "record":
+            p.save()
+            p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QColor(229, 57, 53))
+            p.drawEllipse(QPointF(b.r.x() + 17, b.r.center().y()), 6.5, 6.5)
+            p.setFont(self.ui_font)
+            p.setPen(INK)
+            p.drawText(b.r.adjusted(30, 0, 0, 0), Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, T("Записать"))
+            p.restore()
+            return
         name = b.tool if b.cmd == "tool" else b.cmd
-        dim = b.cmd == "undo" and not self.shapes and self.editing is None
+        dim = (b.cmd == "undo" and not self.shapes and self.editing is None) or (b.cmd == "sound" and not self.rec_sys) or (b.cmd == "mic" and not self.rec_mic)
         draw_icon(p, name, b.r, QColor(170, 170, 170) if dim else INK, self.color)
+        if b.cmd in ("sound", "mic") and dim:   # crossed out while off
+            p.save()
+            p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+            p.setPen(QPen(QColor(170, 170, 170), 1.8, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+            c = b.r.center()
+            p.drawLine(QPointF(c.x() - 8, c.y() - 8), QPointF(c.x() + 8, c.y() + 8))
+            p.restore()
 
     def draw_palette(self, p):
         self.draw_bar(p, self.palette_rect)
@@ -896,6 +933,15 @@ class CaptureSession(QObject):
         elif b.cmd == "close":
             self.cancel()
             return
+        elif b.cmd == "record":
+            self.record()
+            return
+        elif b.cmd == "sound":
+            self.rec_sys = not self.rec_sys
+            self.S.set(VideoSysAudio=self.rec_sys)
+        elif b.cmd == "mic":
+            self.rec_mic = not self.rec_mic
+            self.S.set(VideoMic=self.rec_mic)
         self.refresh()
 
     def upload_menu(self, win, b):
@@ -929,7 +975,20 @@ class CaptureSession(QObject):
         out.setDevicePixelRatio(1.0)
         return out
 
+    def record(self):
+        """Video mode: hand over the screen and the area (logical pixels, global) and close."""
+        if not self.has_sel or self.done:
+            return
+        shot = self.shots[self.active]
+        area = self.sel.translated(shot.geo.x(), shot.geo.y()).toAlignedRect()
+        self.done = True
+        self.close_all()
+        self.finished.emit("record", {"screen": shot.screen, "area": area, "sys": self.rec_sys, "mic": self.rec_mic}, "")
+
     def finish(self, action, dest=""):
+        if self.video:
+            self.record()
+            return
         self.commit_text()
         if not self.has_sel or self.done:
             return
@@ -993,6 +1052,8 @@ class CaptureSession(QObject):
                 self.update_active()
                 return
 
+        if self.video and ctrl and k != Qt.Key.Key_A:
+            return   # no copy/save/print/upload while choosing a video area
         if e.matches(QKeySequence.StandardKey.Copy):
             self.finish("copy")
             return
@@ -1039,7 +1100,7 @@ class CaptureSession(QObject):
             self.sel = r.intersected(self.screen_rect(self.active))
             self.refresh()
             return
-        if not ctrl and self.has_sel:
+        if not ctrl and self.has_sel and not self.video:
             keys = {Qt.Key.Key_P: "pen", Qt.Key.Key_L: "line", Qt.Key.Key_A: "arrow", Qt.Key.Key_R: "rect",
                     Qt.Key.Key_E: "ellipse", Qt.Key.Key_M: "marker", Qt.Key.Key_T: "text", Qt.Key.Key_N: "step",
                     Qt.Key.Key_B: "pixelate", Qt.Key.Key_U: "blur"}
@@ -1072,6 +1133,13 @@ class CaptureSession(QObject):
         self.editing = tx
         self.layout()
         self.hover_btn = next(b for b in self.btns if b.cmd == "upload")
+
+    def test_video(self, rect: QRectF):
+        self.active = 0
+        self.sel = QRectF(rect)
+        self.has_sel = True
+        self.layout()
+        self.hover_btn = next(b for b in self.btns if b.cmd == "record")
 
     def test_hover(self, pt):
         self.mouse = QPointF(pt)
@@ -1191,6 +1259,22 @@ def draw_icon(p: QPainter, name, r: QRectF, ink: QColor, color: QColor):
         path.closeSubpath()
         p.drawPath(path)
         p.drawLine(P(x - u, y - u * 0.05), P(x + u, y - u * 0.05))
+    elif name == "sound":
+        path = QPainterPath(P(x - u, y - 2.5))
+        path.lineTo(P(x - u + 3.5, y - 2.5))
+        path.lineTo(P(x - 0.5, y - u + 0.5))
+        path.lineTo(P(x - 0.5, y + u - 0.5))
+        path.lineTo(P(x - u + 3.5, y + 2.5))
+        path.lineTo(P(x - u, y + 2.5))
+        path.closeSubpath()
+        p.drawPath(path)
+        p.drawArc(QRectF(x - 2, y - 4, 6, 8), -60 * 16, 120 * 16)
+        p.drawArc(QRectF(x - 3, y - 7.5, 11, 15), -60 * 16, 120 * 16)
+    elif name == "mic":
+        p.drawRoundedRect(QRectF(x - 3, y - u, 6, 10), 3, 3)
+        p.drawArc(QRectF(x - 5.5, y - 4, 11, 9), 180 * 16, 180 * 16)
+        p.drawLine(P(x, y + 5), P(x, y + u))
+        p.drawLine(P(x - 3.5, y + u), P(x + 3.5, y + u))
     elif name == "close":
         p.drawLine(P(x - u * 0.8, y - u * 0.8), P(x + u * 0.8, y + u * 0.8))
         p.drawLine(P(x + u * 0.8, y - u * 0.8), P(x - u * 0.8, y + u * 0.8))

@@ -134,6 +134,44 @@ class SettingsDialog(QDialog):
         self._fmt_state()
         right.addWidget(g)
 
+        # Video
+        g = QGroupBox(T("Запись видео"))
+        f = QFormLayout(g)
+        self.vkey_on = QCheckBox(T("Начать и остановить:"))
+        self.vkey_on.setChecked(bool(s.data.get("VideoHotkeyOn", True)))
+        self.vkeys = QKeySequenceEdit(QKeySequence(s.data.get("VideoHotkey", "")))
+        try:
+            self.vkeys.setMaximumSequenceLength(1)
+        except Exception:
+            pass
+        self.vkey_on.toggled.connect(self.vkeys.setEnabled)
+        self.vkeys.setEnabled(self.vkey_on.isChecked() and hotkey_supported)
+        if not hotkey_supported:
+            self.vkey_on.setEnabled(False)
+        f.addRow(self.vkey_on, self.vkeys)
+        self.v_sys = QCheckBox(T("Звук компьютера"))
+        self.v_sys.setChecked(bool(s.data.get("VideoSysAudio", True)))
+        self.v_mic = QCheckBox(T("Микрофон"))
+        self.v_mic.setChecked(bool(s.data.get("VideoMic", False)))
+        row = QHBoxLayout()
+        row.addWidget(self.v_sys)
+        row.addWidget(self.v_mic)
+        row.addStretch(1)
+        f.addRow(T("Звук:"), row)
+        self.v_fps = QComboBox()
+        self.v_fps.addItems(["15", "30", "60"])
+        self.v_fps.setCurrentText(str(s.data.get("VideoFps", 30)))
+        f.addRow(T("Кадров в секунду:"), self.v_fps)
+        self.v_folder = QLineEdit(s.data.get("VideoFolder", ""))
+        vb = QPushButton(T("Обзор…"))
+        vb.clicked.connect(self._pick_video_folder)
+        row = QHBoxLayout()
+        row.addWidget(self.v_folder, 1)
+        row.addWidget(vb)
+        f.addRow(T("Папка:"), row)
+        f.addRow("", hint(T("Видео сохраняется в MP4. Звук и микрофон можно включить и перед записью, на панели выбора области.")))
+        right.addWidget(g)
+
         # General
         g = QGroupBox(T("Общее"))
         v = QVBoxLayout(g)
@@ -269,6 +307,11 @@ class SettingsDialog(QDialog):
         if errors:
             QMessageBox.warning(self, T("Кадр"), T("Не всё удалось импортировать:") + "\n\n" + "\n".join(errors))
 
+    def _pick_video_folder(self):
+        d = QFileDialog.getExistingDirectory(self, T("Куда сохранять видео"), self.v_folder.text())
+        if d:
+            self.v_folder.setText(d)
+
     def pick_folder(self):
         d = QFileDialog.getExistingDirectory(self, T("Куда сохранять снимки"), self.folder.text())
         if d:
@@ -283,6 +326,14 @@ class SettingsDialog(QDialog):
         code = i18n.CODES[max(0, self.lang.currentIndex())]
         self.language_changed = code != i18n.current()
         keys = self.keys.keySequence().toString(QKeySequence.SequenceFormat.PortableText)
+        vkeys = self.vkeys.keySequence().toString(QKeySequence.SequenceFormat.PortableText) or s.data.get("VideoHotkey", "")
+        if self.vkey_on.isChecked() and vkeys == (keys or s.Hotkey) and self.hook.isChecked():
+            QMessageBox.warning(self, T("Кадр"), T("Для снимка и для видео нужны разные сочетания клавиш."))
+            self.vkeys.setFocus()
+            return
+        s.set(VideoHotkeyOn=self.vkey_on.isChecked(), VideoHotkey=vkeys, VideoSysAudio=self.v_sys.isChecked(),
+              VideoMic=self.v_mic.isChecked(), VideoFps=int(self.v_fps.currentText()),
+              VideoFolder=self.v_folder.text().strip() or s.data.get("VideoFolder", ""))
         s.set(CopyLink=self.copy_link.isChecked(),
               OpenInBrowser=self.open_browser.isChecked(), AskFileName=self.ask_name.isChecked(),
               SaveFolder=self.folder.text().strip() or s.SaveFolder, HookPrintScreen=self.hook.isChecked(),

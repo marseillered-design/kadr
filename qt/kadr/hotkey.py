@@ -13,11 +13,14 @@ from . import platform_utils
 
 
 class GlobalHotkey(QObject):
+    """One system-wide key. kind="capture" (screenshot) or "video" (start/stop a recording): each kind has its own
+    Carbon hotkey id on macOS and its own GNOME shortcut, so the two never mix up."""
     activated = Signal()
 
-    def __init__(self):
+    def __init__(self, kind="capture"):
         super().__init__()
         self._impl = None
+        self.kind = kind
 
     def supported(self) -> bool:
         if platform_utils.MAC:
@@ -37,9 +40,9 @@ class GlobalHotkey(QObject):
         key, mods = combo.key(), combo.keyboardModifiers()
         try:
             if platform_utils.MAC:
-                self._impl = _MacHotkey(key, mods, self.activated.emit)
+                self._impl = _MacHotkey(key, mods, self.activated.emit, 1 if self.kind == "capture" else 2)
             elif platform_utils.is_wayland():
-                self._impl = _GnomeShortcut(key, mods)
+                self._impl = _GnomeShortcut(key, mods, self.kind)
             else:
                 self._impl = _X11Hotkey(key, mods, self.activated.emit)
             return self._impl.ok
@@ -51,7 +54,7 @@ class GlobalHotkey(QObject):
         """The user switched the hotkey off: also remove it from GNOME's own shortcuts."""
         self.unregister()
         if platform_utils.LINUX and platform_utils.is_wayland() and _GnomeShortcut.available():
-            _GnomeShortcut.remove()
+            _GnomeShortcut.remove(self.kind)
 
     def unregister(self):
         if self._impl is not None:
@@ -83,7 +86,7 @@ def _fourcc(s):
 
 
 class _MacHotkey:
-    def __init__(self, key, mods, callback):
+    def __init__(self, key, mods, callback, hid_number=1):
         import ctypes
         from ctypes import CFUNCTYPE, POINTER, Structure, c_int32, c_uint32, c_void_p
 
@@ -115,8 +118,16 @@ class _MacHotkey:
         carbon.UnregisterEventHotKey.argtypes = [c_void_p]
         carbon.RemoveEventHandler.argtypes = [c_void_p]
 
+        carbon.GetEventParameter.argtypes = [c_void_p, c_uint32, c_uint32, c_void_p, c_uint32, c_void_p, c_void_p]
+        carbon.GetEventParameter.restype = c_int32
+
         def handler(call_ref, event, user):
+            # every Kadr hotkey reaches every handler: act only on our own id
             try:
+                got = EventHotKeyID()
+                if carbon.GetEventParameter(event, _fourcc("----"), _fourcc("hkid"), None, ctypes.sizeof(got), None, ctypes.byref(got)) == 0 \
+                        and got.id != hid_number:
+                    return -9874   # eventNotHandledErr: let the other handler have it
                 callback()
             except Exception:
                 pass
@@ -129,7 +140,7 @@ class _MacHotkey:
         if carbon.InstallEventHandler(target, self._handler, 1, ctypes.byref(spec), None, ctypes.byref(self._handler_ref)) != 0:
             return
         self._hotkey_ref = c_void_p()
-        hid = EventHotKeyID(_fourcc("KADR"), 1)
+        hid = EventHotKeyID(_fourcc("KADR"), hid_number)
         self.ok = carbon.RegisterEventHotKey(code, m, hid, target, 0, ctypes.byref(self._hotkey_ref)) == 0
 
     def close(self):
@@ -142,8 +153,13 @@ class _MacHotkey:
 # ---------------- Linux Wayland on GNOME (Ubuntu, Fedora): a custom shortcut in the system settings ----------------
 
 _GNOME_LIST = ("org.gnome.settings-daemon.plugins.media-keys", "custom-keybindings")
-_GNOME_PATH = "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/kadr/"
-_GNOME_ITEM = "org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:" + _GNOME_PATH
+_GNOME_PATHS = {"capture": "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/kadr/",
+                "video": "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/kadr-video/"}
+_GNOME_ARGS = {"capture": "--capture", "video": "--record"}
+
+
+def _gnome_item(kind):
+    return "org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:" + _GNOME_PATHS[kind]
 
 _GNOME_KEYS = {Qt.Key.Key_PageUp: "Page_Up", Qt.Key.Key_PageDown: "Page_Down", Qt.Key.Key_Print: "Print",
                Qt.Key.Key_Home: "Home", Qt.Key.Key_End: "End", Qt.Key.Key_Insert: "Insert", Qt.Key.Key_Pause: "Pause",
@@ -168,8 +184,9 @@ class _GnomeShortcut:
         import shutil
         return "GNOME" in os.environ.get("XDG_CURRENT_DESKTOP", "").upper() and shutil.which("gsettings") is not None
 
-    def __init__(self, key, mods):
+    def __init__(self, key, mods, kind="capture"):
         self.ok = False
+        path, item = _GNOME_PATHS[kind], _gnome_item(kind)
         if key in _GNOME_KEYS:
             name = _GNOME_KEYS[key]
         elif Qt.Key.Key_F1 <= key <= Qt.Key.Key_F24:
@@ -185,23 +202,24 @@ class _GnomeShortcut:
         if mods & Qt.KeyboardModifier.MetaModifier: accel += "<Super>"
         current = _gsettings("get", *_GNOME_LIST)
         paths = [] if current.startswith("@as") else [p.strip().strip("'") for p in current.strip("[]").split(",") if p.strip()]
-        if _GNOME_PATH not in paths:
-            paths.append(_GNOME_PATH)
+        if path not in paths:
+            paths.append(path)
             _gsettings("set", *_GNOME_LIST, "[" + ", ".join(f"'{p}'" for p in paths) + "]")
-        _gsettings("set", _GNOME_ITEM, "name", "Kadr")
-        _gsettings("set", _GNOME_ITEM, "command", platform_utils.executable_command() + " --capture")
-        _gsettings("set", _GNOME_ITEM, "binding", accel + name)
+        _gsettings("set", item, "name", "Kadr" if kind == "capture" else "Kadr video")
+        _gsettings("set", item, "command", platform_utils.executable_command() + " " + _GNOME_ARGS[kind])
+        _gsettings("set", item, "binding", accel + name)
         self.ok = True
 
     @staticmethod
-    def remove():
+    def remove(kind="capture"):
+        path, item = _GNOME_PATHS[kind], _gnome_item(kind)
         try:
             current = _gsettings("get", *_GNOME_LIST)
             paths = [p.strip().strip("'") for p in current.strip("[]").split(",") if p.strip() and not current.startswith("@as")]
-            if _GNOME_PATH in paths:
-                paths.remove(_GNOME_PATH)
+            if path in paths:
+                paths.remove(path)
                 _gsettings("set", *_GNOME_LIST, "[" + ", ".join(f"'{p}'" for p in paths) + "]" if paths else "@as []")
-            _gsettings("reset", _GNOME_ITEM, "binding")
+            _gsettings("reset", item, "binding")
         except Exception:
             pass
 

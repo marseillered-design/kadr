@@ -63,6 +63,15 @@ def render_test(out_dir: str) -> int:
     img.save(str(out / "qt-overlay-hover.png"))
     sess.close_all()
 
+    sess = CaptureSession(s, [Shot(screen, QRect(0, 0, W, H), _fake_screen(W, H))], video=True)
+    sess.test_video(QRectF(240, 140, 960, 540))
+    img = QImage(W, H, QImage.Format.Format_ARGB32_Premultiplied)
+    p = QPainter(img)
+    sess.paint(0, p, QRect(0, 0, W, H))
+    p.end()
+    img.save(str(out / "qt-overlay-video.png"))
+    sess.close_all()
+
     from .dialogs import HistoryDialog, SettingsDialog, UploaderDialog
     for name, w in (("qt-settings", SettingsDialog(s, True)), ("qt-settings-wayland", SettingsDialog(s, False)),
                     ("qt-uploader", UploaderDialog(s, s.Uploaders[0])), ("qt-history", HistoryDialog(s))):
@@ -82,6 +91,18 @@ def render_test(out_dir: str) -> int:
     app.processEvents()
     t.grab().save(str(out / "qt-toast-saved.png"))
     t.close()
+    t = toast.info(_fake_screen(800, 450), i18n.T("Видео записано"), "1:23 · 11,8 МБ · Video 2026-11-25 15-30-00.mp4")
+    t.set_button("folder", lambda: None, False)
+    t.add_button("upload", lambda: None)
+    app.processEvents()
+    t.grab().save(str(out / "qt-toast-video.png"))
+    t.close()
+    from .recordui import RecordPanel
+    rp = RecordPanel(QRect(200, 200, 800, 450), lambda: 75.0, "Shift+PgDown")
+    rp.show()
+    app.processEvents()
+    rp.grab().save(str(out / "qt-record-panel.png"))
+    rp.close()
 
     from .app import app_icon_pixmap
     app_icon_pixmap(256).save(str(out / "qt-icon.png"))

@@ -167,6 +167,11 @@ class KadrApp(QObject):
         updater.cleanup()
         self.hotkey = GlobalHotkey()
         self.hotkey.activated.connect(lambda: self.capture(False))
+        self.video_hotkey = GlobalHotkey("video")
+        self.video_hotkey.activated.connect(self.toggle_video)
+        self.rec = None             # the recording in progress
+        self.rec_frame = self.rec_panel = None
+        self.rec_starting = False
 
         self.tray = QSystemTrayIcon(tray_icon())
         toast.tray_icon = self.tray
@@ -212,6 +217,11 @@ class KadrApp(QObject):
             shot.setShortcut(self.S.Hotkey)
             shot.setShortcutVisibleInContextMenu(True)
         m.addAction(T("Снимок экрана целиком"), lambda: self.capture(True))
+        self.video_action = m.addAction(T("Записать видео"), self.toggle_video)
+        if self.S.VideoHotkeyOn and self.hotkey_supported_cached():
+            self.video_action.setShortcut(self.S.VideoHotkey)
+            self.video_action.setShortcutVisibleInContextMenu(True)
+        m.aboutToShow.connect(lambda: self.video_action.setText(T("Остановить запись") if self.rec is not None else T("Записать видео")))
         m.addSeparator()
         m.addAction(T("Загрузить картинку с компьютера…"), self.upload_from_disk)
         m.addAction(T("Загрузить картинку из буфера"), self.upload_from_clipboard)
@@ -254,21 +264,35 @@ class KadrApp(QObject):
             self.hotkey.disable()
         else:
             self.hotkey.unregister()
+        if self.S.VideoHotkeyOn and self.video_hotkey.supported():
+            if not self.video_hotkey.register(self.S.VideoHotkey):
+                vmsg = F("Сочетание {0} занято другой программой. Выбери другое в настройках.", self.video_key_text())
+                QTimer.singleShot(1800 if first else 0, lambda: toast.error(T("Кадр"), vmsg))
+        elif not self.S.VideoHotkeyOn:
+            self.video_hotkey.disable()
+        else:
+            self.video_hotkey.unregister()
         self.tray.setToolTip(F("Кадр — снимок по {0}", self.key_text()) if self.hotkey.supported() and self.S.HookPrintScreen
                              else T("Кадр — щёлкни для снимка"))
+
+    def video_key_text(self):
+        from PySide6.QtGui import QKeySequence
+        return QKeySequence(self.S.VideoHotkey).toString(QKeySequence.SequenceFormat.NativeText)
 
     # ---- messages from a second start ("kadr --capture", "kadr file.png") ----
     def handle_args(self, args: list[str]):
         files = [a for a in args if not a.startswith("--") and Path(a).is_file()]
         if files:
             self.upload_files(files)
+        elif "--record" in args:
+            self.toggle_video()
         elif "--full" in args:
             self.capture(True)
         elif "--capture" in args or not [a for a in args if a == "--tray"]:
             self.capture(False)
 
     # ---- capture ----
-    def capture(self, full: bool):
+    def capture(self, full: bool, video=False):
         if self.session is not None:
             return
         if platform_utils.MAC and not platform_utils.screen_capture_allowed(ask=True):
@@ -284,7 +308,7 @@ class KadrApp(QObject):
             return
         if not shots:
             return
-        self.session = CaptureSession(self.S, shots, capture.window_list(), full)
+        self.session = CaptureSession(self.S, shots, capture.window_list(), full, video)
         self.session.finished.connect(self._captured)
         self.session.show()
         if os.environ.get("KADR_SELFTEST"):
@@ -309,6 +333,9 @@ class KadrApp(QObject):
         self.session = None
         self.S.save()
         QTimer.singleShot(1500, trim_memory)
+        if action == "record":
+            self.start_recording(img)
+            return
         if not action or img is None:
             return
         if action == "copy":
@@ -487,7 +514,111 @@ class KadrApp(QObject):
 
     # ---- updates ----
     def busy(self) -> bool:
-        return self.session is not None or self.settings_dlg is not None or self.active_uploads > 0
+        return self.session is not None or self.settings_dlg is not None or self.active_uploads > 0 or self.rec is not None
+
+    # ---- video ----
+    def toggle_video(self):
+        """The recording hotkey and menu item: choose an area, or stop the recording in progress."""
+        if self.rec is not None:
+            self.stop_recording(False)
+        elif not self.rec_starting:
+            self.capture(False, video=True)
+
+    def start_recording(self, info):
+        from datetime import datetime
+        from . import recorder, recordui
+        folder = Path(self.S.VideoFolder)
+        try:
+            folder.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            toast.error(T("Не удалось начать запись"), str(e))
+            return
+        path = str(folder / (T("Видео") + " " + datetime.now().strftime("%Y-%m-%d %H-%M-%S") + ".mp4"))
+        r = recorder.Recorder(info["screen"], info["area"], path, self.S.VideoFps, info["sys"], info["mic"])
+        self.rec_starting = True
+
+        def go():
+            # a moment for the selection screen to disappear, so it is not in the first frame
+            self.rec_starting = False
+            try:
+                r.start()
+            except Exception as e:
+                toast.error(T("Не удалось начать запись"), str(e))
+                return
+            self.rec = r
+            r.failed.connect(lambda err: self.stop_recording(False) if self.rec is r else None)
+            r.finished.connect(lambda ok, err: self._recorded(r, ok, err))
+            if not platform_utils.is_wayland():   # Wayland cannot place windows round the area
+                self.rec_frame = recordui.RecordFrame(info["area"])
+                self.rec_frame.show()
+            self.rec_panel = recordui.RecordPanel(info["area"], r.elapsed_seconds,
+                                                  self.video_key_text() if self.S.VideoHotkeyOn and self.video_hotkey.supported() else "")
+            self.rec_panel.pause_clicked.connect(self._toggle_pause)
+            self.rec_panel.stop_clicked.connect(lambda: self.stop_recording(False))
+            self.rec_panel.discard_clicked.connect(lambda: self.stop_recording(True))
+            self.rec_panel.show()
+            missing = [n for want, src, n in ((info["sys"], r.sys, T("звук компьютера")), (info["mic"], r.mic, T("микрофон"))) if want and src is None]
+            if missing:
+                toast.info(None, T("Запись идёт без части звука"), F("Не нашлось устройство: {0}.", ", ".join(missing)), None, 8)
+
+        QTimer.singleShot(200, go)
+
+    def _toggle_pause(self):
+        if self.rec is None:
+            return
+        self.rec.set_paused(not self.rec.paused)
+        if self.rec_panel is not None:
+            self.rec_panel.set_paused(self.rec.paused)
+        if self.rec_frame is not None:
+            self.rec_frame.set_paused(self.rec.paused)
+
+    def stop_recording(self, discard):
+        r = self.rec
+        if r is None:
+            return
+        self.rec = None
+        r.discard = discard
+        r.seconds = r.elapsed_seconds()
+        for w in (self.rec_panel, self.rec_frame):
+            if w is not None:
+                w.close()
+                w.deleteLater()
+        self.rec_panel = self.rec_frame = None
+        r.stop()
+
+    def _recorded(self, r, ok, err):
+        QTimer.singleShot(1500, trim_memory)
+        path = r.path
+        if getattr(r, "discard", False):
+            try:
+                os.remove(path)
+            except Exception:
+                pass
+            return
+        if not ok:
+            toast.error(T("Запись прервалась"), err or "")
+            return
+        from . import recordui
+        size = os.path.getsize(path) if os.path.exists(path) else 0
+        text = f"{recordui.duration(getattr(r, 'seconds', 0))} · {recordui.file_size(size)} · {Path(path).name}"
+        upload = lambda: self.upload_video(path, r.thumb)
+        if platform_utils.is_wayland():
+            d = recordui.VideoDoneDialog(T("Видео записано"), text, lambda: platform_utils.open_file(path),
+                                         lambda: platform_utils.reveal(path), upload, F("Загрузить в {0}", self.S.default()))
+            d.show()
+            self._done_dialog = d
+            return
+        t = toast.info(r.thumb, T("Видео записано"), text, lambda: platform_utils.open_file(path), 20)
+        t.set_button("folder", lambda: platform_utils.reveal(path), False)
+        t.add_button("upload", upload)
+
+    def upload_video(self, path, thumb):
+        try:
+            data = Path(path).read_bytes()
+        except Exception as e:
+            toast.error(T("Не открылся файл"), str(e))
+            return
+        self.upload(data, Path(path).name, self.S.default(), thumb, False)
 
     def _update_tick(self):
         self.update_timer.setInterval(6 * 60 * 60 * 1000)
@@ -578,6 +709,16 @@ class KadrApp(QObject):
         threading.Thread(target=work, daemon=True).start()
 
     def quit(self):
+        if self.rec is not None:
+            # never lose a recording: let the file be finished before quitting
+            r = self.rec
+            self.stop_recording(False)
+            from PySide6.QtCore import QEventLoop, QElapsedTimer
+            t = QElapsedTimer()
+            t.start()
+            while not getattr(r, "_reported", False) and t.elapsed() < 8000:
+                self.qapp.processEvents(QEventLoop.ProcessEventsFlag.AllEvents, 100)
+        self.video_hotkey.unregister()
         self.hotkey.unregister()
         self.tray.hide()
         self.S.save()
@@ -647,6 +788,9 @@ def main(argv=None):
     if argv[:1] == ["--upload-test"]:
         from .selftest import upload_test
         return upload_test(argv[1], argv[2])
+    if argv[:1] == ["--record-test"]:
+        from .recorder import record_test
+        return record_test(argv[1], float(argv[2]) if len(argv) > 2 else 3.0)
 
     QApplication.setApplicationName("Kadr")
     QApplication.setOrganizationName("Kadr")
@@ -696,6 +840,8 @@ def main(argv=None):
     files = [a for a in argv if not a.startswith("--") and Path(a).is_file()]
     if files:
         QTimer.singleShot(300, lambda: kadr.upload_files(files))
+    elif "--record" in argv:
+        QTimer.singleShot(300, kadr.toggle_video)
     elif "--capture" in argv or "--full" in argv:
         QTimer.singleShot(300, lambda: kadr.capture("--full" in argv))
 

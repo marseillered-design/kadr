@@ -4,9 +4,9 @@ import sys
 
 mac = sys.platform == "darwin"
 
-hidden = ["kadr.selftest"]
+hidden = ["kadr.selftest", "kadr.recorder", "kadr.recordui", "PySide6.QtMultimedia"]
 if mac:
-    hidden += ["Quartz", "AppKit", "objc"]
+    hidden += ["Quartz", "AppKit", "objc", "ScreenCaptureKit", "CoreMedia", "kadr.macaudio"]
 else:
     hidden += ["jeepney", "jeepney.io.blocking", "Xlib", "Xlib.display", "Xlib.XK", "Xlib.X", "Xlib.error",
                "keyring.backends.SecretService"]
@@ -16,7 +16,7 @@ a = Analysis(
     pathex=["."],
     datas=[("kadr/lang.json", "kadr")] + [(f"../icons/kadr-{n}.png", "kadr/icons") for n in (16, 20, 24, 32, 48, 64, 128, 256, 512)],
     hiddenimports=hidden,
-    excludes=["tkinter", "PySide6.QtQml", "PySide6.QtQuick", "PySide6.QtWebEngineCore", "PySide6.QtMultimedia",
+    excludes=["tkinter", "PySide6.QtQml", "PySide6.QtQuick", "PySide6.QtWebEngineCore", "PySide6.QtMultimediaWidgets",
               "PySide6.Qt3DCore", "PySide6.QtCharts", "PySide6.QtPdf", "PySide6.QtSql", "PySide6.QtTest"],
 )
 # Smaller installers: drop the parts of Qt that Kadr never uses. Kept on purpose: QtNetwork (single-instance
@@ -60,6 +60,8 @@ if mac:
             "LSUIElement": True,                      # lives in the menu bar, no Dock icon
             "NSHighResolutionCapable": True,
             "LSMinimumSystemVersion": "11.0",
+            # asked the first time a video records the microphone (without it macOS ends the app)
+            "NSMicrophoneUsageDescription": "Kadr records your microphone into screen videos when you switch it on.",
             "CFBundleDocumentTypes": [{
                 "CFBundleTypeName": "Image",
                 "CFBundleTypeRole": "Viewer",

@@ -30,6 +30,7 @@ class Toast(QWidget):
         self.on_click = None
         self.btn_icon, self.btn_action, self.btn_tick = None, None, False
         self.btn_hot = self.copied = self.hot = False
+        self.btn2_icon, self.btn2_action, self.btn2_hot = None, None, False
         self.phase = 0
         self.dark = platform_utils.dark_mode()
         self.anim = QTimer(self)
@@ -64,9 +65,17 @@ class Toast(QWidget):
         self.btn_icon, self.btn_action, self.btn_tick = icon, action, tick
         self.update()
 
+    def add_button(self, icon, action):
+        """A second icon button, left of the first (e.g. upload the video); closes the notice when pressed."""
+        self.btn2_icon, self.btn2_action = icon, action
+        self.update()
+
     # ---- painting ----
     def btn_rect(self):
         return QRectF(self.W - 44, self.H - 44, 34, 34)
+
+    def btn2_rect(self):
+        return QRectF(self.W - 82, self.H - 44, 34, 34)
 
     def close_rect(self):
         return QRectF(self.W - 28, 6, 22, 22)
@@ -104,7 +113,7 @@ class Toast(QWidget):
         f.setPixelSize(13)
         p.setFont(f)
         p.setPen(sub)
-        text_right = self.btn_rect().left() - 6 if self.btn_icon else self.W - 12
+        text_right = self.btn2_rect().left() - 6 if self.btn2_icon else self.btn_rect().left() - 6 if self.btn_icon else self.W - 12
         p.drawText(QRectF(x, 42, text_right - x, 38), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop | Qt.TextFlag.TextWordWrap,
                    self.text or "")
         cr = self.close_rect()
@@ -123,6 +132,14 @@ class Toast(QWidget):
                 p.drawPolyline([QPointF(c.x() - 6, c.y()), QPointF(c.x() - 1.5, c.y() + 4.5), QPointF(c.x() + 6.5, c.y() - 5)])
             else:
                 draw_icon(p, self.btn_icon, br, col, col)
+        if self.btn2_icon:
+            b2 = self.btn2_rect()
+            if self.btn2_hot:
+                hp = QPainterPath()
+                hp.addRoundedRect(b2, 6, 6)
+                p.fillPath(hp, QColor(62, 62, 66) if self.dark else QColor(234, 236, 240))
+            col = QColor(225, 225, 225) if self.dark else QColor(50, 50, 54)
+            draw_icon(p, self.btn2_icon, b2, col, col)
         if self.busy:
             w = self.W // 3
             pos = (self.phase * 8) % (self.W + w) - w
@@ -145,20 +162,27 @@ class Toast(QWidget):
 
     def leaveEvent(self, e):
         self.hot = False
-        if self.btn_hot:
-            self.btn_hot = False
+        if self.btn_hot or self.btn2_hot:
+            self.btn_hot = self.btn2_hot = False
             self.update()
 
     def mouseMoveEvent(self, e):
         h = bool(self.btn_icon) and self.btn_rect().contains(e.position())
-        if h != self.btn_hot:
-            self.btn_hot = h
+        h2 = bool(self.btn2_icon) and self.btn2_rect().contains(e.position())
+        if h != self.btn_hot or h2 != self.btn2_hot:
+            self.btn_hot, self.btn2_hot = h, h2
             self.update()
 
     def mouseReleaseEvent(self, e):
         pos = e.position()
         if self.close_rect().contains(pos) or e.button() == Qt.MouseButton.RightButton:
             self.close()
+            return
+        if self.btn2_icon and self.btn2_rect().contains(pos):
+            action = self.btn2_action
+            self.close()
+            if action:
+                action()
             return
         if self.btn_icon and self.btn_rect().contains(pos):
             self.btn_action()
@@ -199,6 +223,9 @@ class _SystemNotice:
             tray_icon.showMessage(title, text or "", icon, seconds * 1000)
 
     def set_button(self, *a):
+        pass
+
+    def add_button(self, *a):
         pass
 
     def close(self):

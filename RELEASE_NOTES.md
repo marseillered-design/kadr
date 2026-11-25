@@ -1,5 +1,7 @@
 **Kadr** — screenshots for Windows, macOS and Linux with drawing tools and upload to Catbox, Imgur or your own service.
 
+**New in 1.5.0: screen recording on macOS and Linux** — ⌘⇧7 on a Mac, Shift+PageDown on Linux: area or window, computer sound and microphone, pause, stop, discard, upload from the notice.
+
 **New in 1.4.1:** simpler Settings — no key fields any more; services that work without sign-up are listed instead (Imgur appears once it has a key).
 
 **New in 1.4.0: ImgBB.** Upload screenshots to ImgBB (pictures up to 32 MB, direct links `i.ibb.co/…`): choose it under “Upload to” or with the ▾ arrow on the screenshot bar.

@@ -38,6 +38,22 @@ def pictures_dir() -> Path:
     return Path.home() / "Pictures"
 
 
+def videos_dir() -> Path:
+    try:
+        from PySide6.QtCore import QStandardPaths
+        p = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.MoviesLocation)
+        if p:
+            return Path(p)
+    except Exception:
+        pass
+    return Path.home() / ("Movies" if sys.platform == "darwin" else "Videos")
+
+
+def default_video_hotkey() -> str:
+    # ⌘⇧5 is macOS's own recorder, ⌘⇧3/4 its screenshots: ⌘⇧7 is free
+    return "Ctrl+Shift+7" if sys.platform == "darwin" else "Shift+PgDown"
+
+
 def default_hotkey() -> str:
     # Macs often have no PageUp key; ⌘⇧2 is free (⌘⇧3/4/5 belong to macOS).
     return "Ctrl+Shift+2" if sys.platform == "darwin" else "Shift+PgUp"
@@ -66,6 +82,12 @@ DEFAULTS = {
     "ProxyAddress": "",
     "ProxyUser": "",
     "ProxyPasswordFallback": "",      # only when no system keychain is available
+    "VideoHotkeyOn": True,
+    "VideoHotkey": "",                # QKeySequence text
+    "VideoSysAudio": True,
+    "VideoMic": False,
+    "VideoFps": 30,
+    "VideoFolder": "",
 }
 
 UPLOADER_DEFAULTS = {
@@ -97,6 +119,12 @@ class Settings:
             d["SaveFolder"] = str(pictures_dir() / "Kadr")
         if not d["Hotkey"]:
             d["Hotkey"] = default_hotkey()
+        if not d["VideoHotkey"] or d["VideoHotkey"] == d["Hotkey"]:
+            d["VideoHotkey"] = default_video_hotkey() if default_video_hotkey() != d["Hotkey"] else default_hotkey()
+        if not d["VideoFolder"]:
+            d["VideoFolder"] = str(videos_dir() / "Kadr")
+        if d["VideoFps"] not in (15, 30, 60):
+            d["VideoFps"] = 30
         if d["ImageFormat"] not in ("png", "jpg"):
             d["ImageFormat"] = "png"
         d["JpegQuality"] = max(50, min(100, int(d.get("JpegQuality") or 90)))

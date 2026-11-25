@@ -2,7 +2,7 @@ name: Build Kadr
 
 on:
   push:
-    branches: [main]
+    branches: [main, "test/**"]   # test/... branches: full builds to try before a release
     tags: ["v*"]
   workflow_dispatch:
 
@@ -34,11 +34,15 @@ jobs:
         run: QT_QPA_PLATFORM=offscreen KADR_LANG=ru python -m kadr --render-test selftest
       - name: Repaint check (simulated mouse and keys, no stale areas)
         run: QT_QPA_PLATFORM=offscreen python -m kadr --paint-check
+      - name: Recording check (moving picture + a tone through Qt's encoder into a video file)
+        run: QT_QPA_PLATFORM=offscreen python -m kadr --record-test rec-test.mp4 3
       - name: Stamp the version (the updater compares it with the newest release)
         run: python tools/stamp_version.py
       - run: pyinstaller --noconfirm kadr.spec
       - name: Self-test of the built program
         run: QT_QPA_PLATFORM=offscreen KADR_LANG=uk dist/kadr/kadr --render-test selftest-built
+      - name: Recording check of the built program
+        run: QT_QPA_PLATFORM=offscreen dist/kadr/kadr --record-test rec-built.mp4 3
       - name: .deb and .rpm installers
         run: bash ../installer/linux/build-packages.sh "${VERSION#v}"
       - name: Check the .deb installs and starts
@@ -91,12 +95,16 @@ jobs:
         run: QT_QPA_PLATFORM=offscreen KADR_LANG=ru python -m kadr --render-test selftest
       - name: Repaint check (simulated mouse and keys, no stale areas)
         run: QT_QPA_PLATFORM=offscreen python -m kadr --paint-check
+      - name: Recording check (moving picture + a tone through Qt's encoder into a video file)
+        run: QT_QPA_PLATFORM=offscreen python -m kadr --record-test rec-test.mp4 3
       - run: |
           python tools/stamp_version.py
           sed -i '' "s/\"CFBundleShortVersionString\": \"1.0.0\"/\"CFBundleShortVersionString\": \"${VERSION#v}\"/" kadr.spec
           pyinstaller --noconfirm kadr.spec
       - name: Self-test of the built app
         run: QT_QPA_PLATFORM=offscreen KADR_LANG=en dist/Kadr.app/Contents/MacOS/Kadr --render-test selftest-built
+      - name: Recording check of the built app
+        run: QT_QPA_PLATFORM=offscreen dist/Kadr.app/Contents/MacOS/Kadr --record-test rec-built.mp4 3
       - name: Disk image with "drag to Applications"
         run: |
           codesign --force --deep --sign - dist/Kadr.app
