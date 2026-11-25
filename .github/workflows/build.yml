@@ -2,7 +2,7 @@ name: Build Kadr
 
 on:
   push:
-    branches: [main]
+    branches: [main, "test/**"]   # test/... branches: full builds to try before a release
     tags: ["v*"]
   workflow_dispatch:
 
