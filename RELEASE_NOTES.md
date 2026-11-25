@@ -1,5 +1,7 @@
 **Kadr** — screenshots for Windows, macOS and Linux with drawing tools and upload to Catbox, Imgur or your own service.
 
+**New in 1.4.2:** a proper Windows installer — language, welcome, licence, choose the folder, Start menu folder, shortcuts and autostart, finish with "Launch". Remote desktops (RDP, AnyDesk, TeamViewer, virtual machines…) now get the screenshot key while their window is in front, so the screenshot tool on the other computer reacts instead of Kadr (Settings → General).
+
 **New in 1.4.1:** simpler Settings — no key fields any more; services that work without sign-up are listed instead (Imgur appears once it has a key).
 
 **New in 1.4.0: ImgBB.** Upload screenshots to ImgBB (pictures up to 32 MB, direct links `i.ibb.co/…`): choose it under “Upload to” or with the ▾ arrow on the screenshot bar.
