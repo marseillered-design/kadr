@@ -1,5 +1,7 @@
 ﻿; Windows installer for Kadr (Inno Setup 6). Built on GitHub: ISCC installer\windows\kadr.iss
-; Installs for the current user only (no administrator password), into %LOCALAPPDATA%\Programs\Kadr.
+; A full wizard: language, welcome, licence, folder, Start menu folder, options, install, finish with "Launch".
+; Installs for the current user (no administrator password), by default into %LOCALAPPDATA%\Programs\Kadr.
+; The pictures come from qt/tools/installer_art.py. Updates started by Kadr itself run silently into the same folder.
 #ifndef AppVersion
   #define AppVersion "1.0.0"
 #endif
@@ -10,10 +12,21 @@ AppName=Kadr
 AppVerName=Kadr {#AppVersion}
 AppVersion={#AppVersion}
 AppPublisher=Kadr
+AppPublisherURL=https://github.com/marseillered-design/kadr
+AppSupportURL=https://github.com/marseillered-design/kadr/issues
+AppUpdatesURL=https://github.com/marseillered-design/kadr/releases
 VersionInfoVersion={#AppVersion}
 DefaultDirName={localappdata}\Programs\Kadr
-DisableProgramGroupPage=yes
-DisableDirPage=auto
+DefaultGroupName=Kadr
+AllowNoIcons=yes
+DisableWelcomePage=no
+LicenseFile=..\..\LICENSE
+DisableDirPage=no
+DisableProgramGroupPage=no
+DisableReadyPage=no
+WizardImageFile=wizard-164.bmp,wizard-246.bmp,wizard-328.bmp
+WizardSmallImageFile=small-55.bmp,small-83.bmp,small-110.bmp
+WizardImageStretch=no
 PrivilegesRequired=lowest
 OutputDir=..\..\dist
 OutputBaseFilename=Kadr-Setup-Windows
@@ -25,7 +38,7 @@ Compression=lzma2/max
 SolidCompression=yes
 CloseApplications=force
 RestartApplications=no
-ShowLanguageDialog=auto
+ShowLanguageDialog=yes
 
 [Languages]
 Name: "ru"; MessagesFile: "compiler:Languages\Russian.isl"
@@ -62,13 +75,18 @@ it.SendToName=Kadr (carica)
 [Tasks]
 Name: "autostart"; Description: "{cm:Autostart}"
 Name: "sendto"; Description: "{cm:SendTo}"
-Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; Flags: unchecked
+Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 
 [Files]
 Source: "..\..\Kadr.exe"; DestDir: "{app}"; Flags: ignoreversion
 
+[InstallDelete]
+; versions before 1.4.2 put the Start menu shortcut straight into Programs
+Type: files; Name: "{autoprograms}\Kadr.lnk"
+
 [Icons]
-Name: "{autoprograms}\Kadr"; Filename: "{app}\Kadr.exe"
+Name: "{group}\Kadr"; Filename: "{app}\Kadr.exe"
+Name: "{group}\{cm:UninstallProgram,Kadr}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\Kadr"; Filename: "{app}\Kadr.exe"; Tasks: desktopicon
 Name: "{usersendto}\{cm:SendToName}"; Filename: "{app}\Kadr.exe"; Tasks: sendto
 
