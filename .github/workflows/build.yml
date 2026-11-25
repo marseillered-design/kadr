@@ -43,7 +43,13 @@ jobs:
       - name: Self-test of the built program
         run: QT_QPA_PLATFORM=offscreen KADR_LANG=uk dist/kadr/kadr --render-test selftest-built
       - name: Recording check of the built program
-        run: QT_QPA_PLATFORM=offscreen bash tools/ci_check.sh "Recording check, built" dist/kadr/kadr --record-test rec-built.mp4 3
+        run: |
+          # diagnosis as annotations (readable without a sign-in): libraries the recording plugin cannot find
+          missing="$(ldd dist/kadr/_internal/PySide6/Qt/plugins/multimedia/libffmpegmediaplugin.so | grep -i 'not found' | tr '\n' ' ' || true)"
+          echo "::warning title=Recording plugin libraries::${missing:-all found}"
+          dbg="$(QT_DEBUG_PLUGINS=1 QT_QPA_PLATFORM=offscreen dist/kadr/kadr --record-test rec-debug.mp4 1 2>&1 | grep -iE 'ffmpeg|multimedia|cannot|error|not load' | tail -c 1500 | tr '\n' ' ' || true)"
+          echo "::warning title=Recording plugin loading::${dbg:-nothing}"
+          QT_QPA_PLATFORM=offscreen bash tools/ci_check.sh "Recording check, built" dist/kadr/kadr --record-test rec-built.mp4 3
       - name: .deb and .rpm installers
         run: bash ../installer/linux/build-packages.sh "${VERSION#v}"
       - name: Check the .deb installs and starts
