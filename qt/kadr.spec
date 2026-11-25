@@ -38,7 +38,9 @@ a = Analysis(
 import re
 
 _DROP = [
-    r"Qt6?(Quick|Qml|QmlModels|QmlMeta|QmlWorkerScript|VirtualKeyboard|Pdf|Designer|Help|UiTools|Sql|Test|StateMachine)",   # QtConcurrent stays: Qt Multimedia needs it
+    # QtConcurrent stays (Qt Multimedia needs it); on Linux Qt Multimedia's FFmpeg plugin also links Quick and Qml
+    (r"Qt6?(Quick|Qml|QmlModels|QmlMeta|QmlWorkerScript|VirtualKeyboard|Pdf|Designer|Help|UiTools|Sql|Test|StateMachine)" if mac
+     else r"Qt6?(VirtualKeyboard|Pdf|Designer|Help|UiTools|Sql|Test|StateMachine)"),
     r"qml/", r"/(tls|networkinformation|generic|sqldrivers|position|virtualkeyboard)/",
     r"plugins/imageformats/.*(tiff|webp|icns|pdf|wbmp|tga|heif|jp2|macjp2)",
     r"plugins/platforms/.*(vnc|linuxfb|eglfs|minimalegl|minimal\b)",
