@@ -156,6 +156,16 @@ namespace Kadr
             try { r.Start(); }
             catch (Exception ex) { Console.WriteLine("START ERROR " + ex); return 1; }
             if (player != null) player.Play();
+            // an independent GDI picture of the area, to compare the video's first frame with
+            try
+            {
+                using (var gb = new Bitmap(r.Area.Width, r.Area.Height))
+                {
+                    using (var g = Graphics.FromImage(gb)) g.CopyFromScreen(r.Area.Location, Point.Empty, r.Area.Size);
+                    gb.Save(Path.ChangeExtension(Path.GetFullPath(args[1]), ".png"), ImageFormat.Png);
+                }
+            }
+            catch { }
             if (args.Contains("pause"))
             {
                 // a third of the time paused: the video should come out a third shorter
@@ -163,11 +173,28 @@ namespace Kadr
                 Thread.Sleep((int)(secs * 333)); r.SetPaused(false);
                 Thread.Sleep((int)(secs * 333));
             }
-            else Thread.Sleep((int)(secs * 1000));
+            else
+            {
+                Thread.Sleep((int)(secs * 400));
+                // which threads work while recording: CPU per thread over the middle 40 % of the time
+                cpu.Refresh();
+                var before = new System.Collections.Generic.Dictionary<int, double>();
+                foreach (System.Diagnostics.ProcessThread th in cpu.Threads) try { before[th.Id] = th.TotalProcessorTime.TotalMilliseconds; } catch { }
+                Thread.Sleep((int)(secs * 400));
+                cpu.Refresh();
+                var list = new System.Collections.Generic.List<string>();
+                foreach (System.Diagnostics.ProcessThread th in cpu.Threads)
+                    try { double b; if (before.TryGetValue(th.Id, out b)) { double d = th.TotalProcessorTime.TotalMilliseconds - b; if (d > 20) list.Add(string.Format("{0}:{1:0}ms prio={2}", th.Id, d, th.CurrentPriority)); } } catch { }
+                Console.WriteLine("busy threads (" + (secs * 0.4).ToString("0.0") + " s): " + string.Join(", ", list));
+                Thread.Sleep((int)(secs * 200));
+            }
             bool ok = r.Stop();
             if (player != null) player.Stop();
-            if (r.Thumb != null) r.Thumb.Save(Path.ChangeExtension(Path.GetFullPath(args[1]), ".png"), ImageFormat.Png);
+            if (r.Thumb != null) r.Thumb.Save(Path.ChangeExtension(Path.GetFullPath(args[1]), ".thumb.png"), ImageFormat.Png);
             cpu.Refresh();
+            Console.WriteLine("fast=" + r.FastCapture + " hardware=" + r.Hardware + " unchanged=" + r.Unchanged + string.Format(" grab={0:0} compare={1:0} write={2:0} ms", r.MsGrab, r.MsCompare, r.MsWrite));
+            foreach (System.Diagnostics.ProcessThread th in cpu.Threads.Cast<System.Diagnostics.ProcessThread>().OrderByDescending(x => { try { return x.TotalProcessorTime.Ticks; } catch { return 0L; } }).Take(5))
+                try { Console.WriteLine("thread {0} cpu={1:0} ms start={2}", th.Id, th.TotalProcessorTime.TotalMilliseconds, th.StartAddress.ToString("X")); } catch { }
             Console.WriteLine("ok={0} frames={1} fps={2:0.0} size={3} out={4} sys={5} mic={6} bytes={7} cpu={8:0}%", ok, r.Frames, r.Frames / secs, r.Area.Size, r.OutSize, r.SysAudioOn, r.MicOn, r.Bytes,
                 (cpu.TotalProcessorTime - t0).TotalMilliseconds / (secs * 1000) * 100 / Environment.ProcessorCount * Environment.ProcessorCount);
             if (!ok) Console.WriteLine("ERROR " + r.Error);

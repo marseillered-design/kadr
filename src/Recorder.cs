@@ -25,11 +25,22 @@ namespace Kadr
         public Exception Error { get; private set; }
         public Bitmap Thumb { get; private set; }
         public int Frames { get; private set; }
+        /// <summary>Frames that were the same as the one before and were not encoded again.</summary>
+        public int Unchanged { get; private set; }
+        /// <summary>Measurements: milliseconds spent grabbing, comparing and encoding.</summary>
+        public double MsGrab, MsCompare, MsWrite;
+        /// <summary>The screen came through DXGI Desktop Duplication (fast), not GDI BitBlt.</summary>
+        public bool FastCapture { get; private set; }
+        /// <summary>The video card encodes (much less CPU); false = Windows' software encoder.</summary>
+        public bool Hardware { get; private set; }
 
         /// <summary>Raised on a worker thread when recording broke (disk full, encoder error).</summary>
         public event Action Failed;
 
         readonly int fps;
+        static readonly long keepAlive = (long)(double.TryParse(Environment.GetEnvironmentVariable("KADR_KEEPALIVE"), out keepAliveSec) ? keepAliveSec : 1.0) * 10000000L;
+        static double keepAliveSec;
+        static readonly bool skipEncode = Environment.GetEnvironmentVariable("KADR_PROFILE") == "grab";   // build checks: capture only
         readonly Stopwatch clock = new Stopwatch();
         volatile bool stopping, paused;
         Thread videoThread, audioThread;
@@ -66,7 +77,7 @@ namespace Kadr
                     SysAudioOn = sys != null;
                     MicOn = mic != null;
                     Directory.CreateDirectory(Path.GetDirectoryName(FilePath));
-                    writer = new Mp4Writer(FilePath, OutSize.Width, OutSize.Height, fps, sys != null || mic != null, false);
+                    writer = CreateWriter();
                 }
                 catch (Exception ex) { startError = ex; }
                 if (startError == null && writer.HasAudio)
@@ -126,6 +137,26 @@ namespace Kadr
             if (f != null) f();
         }
 
+        /// <summary>
+        /// Windows' software H.264 encoder. KADR_HW=1 tries the video card's encoder (measurements only): fed from
+        /// system memory it used more CPU, not less, and made 3–4× bigger files.
+        /// </summary>
+        Mp4Writer CreateWriter()
+        {
+            bool audio = sys != null || mic != null;
+            if (Environment.GetEnvironmentVariable("KADR_HW") == "1")   // measured: on this kind of input the card saves nothing
+            {
+                try
+                {
+                    var w = new Mp4Writer(FilePath, OutSize.Width, OutSize.Height, fps, audio, true);
+                    Hardware = true;
+                    return w;
+                }
+                catch { try { File.Delete(FilePath); } catch { } }
+            }
+            return new Mp4Writer(FilePath, OutSize.Width, OutSize.Height, fps, audio, false);
+        }
+
         // ---------------- picture ----------------
 
         void VideoLoop()
@@ -135,6 +166,19 @@ namespace Kadr
             Dib scaled = OutSize != Area.Size ? new Dib(screen, OutSize.Width, OutSize.Height) : null;
             long interval = 10000000L / fps;
             var cursors = new CursorCache();
+            // a still screen gives the same picture again and again: comparing (≈2 ms) is far cheaper than encoding
+            // it (≈16 ms at 1440p), so unchanged frames are skipped; one per second still goes in, and the last one at the stop
+            int bytes = OutSize.Width * OutSize.Height * 4;
+            IntPtr prev = Marshal.AllocHGlobal(bytes);
+            bool havePrev = false;
+            long lastWritten = 0;
+            // fast capture through the video card when the area is on one monitor; "clean" keeps the desktop without
+            // the pointer, which is drawn on a fresh copy every frame (the card only sends pictures that changed)
+            DesktopDup dup = Environment.GetEnvironmentVariable("KADR_GDI") == "1" ? null : DesktopDup.TryCreate(Area);
+            Dib clean = dup != null ? new Dib(screen, Area.Width, Area.Height) : null;
+            if (dup != null) dup.CopyFirst(clean.Bits, Area.Width * 4);
+            int areaBytes = Area.Width * Area.Height * 4;
+            FastCapture = dup != null;
             try
             {
                 clock.Start();
@@ -144,7 +188,22 @@ namespace Kadr
                     if (paused) { Thread.Sleep(15); continue; }
                     long t = clock.Elapsed.Ticks;
                     if (t < next) { Thread.Sleep((int)Math.Max(1, (next - t) / 10000)); continue; }
-                    Gdi.BitBlt(grab.Dc, 0, 0, Area.Width, Area.Height, screen, Area.X, Area.Y, Gdi.SRCCOPY);
+                    var sw = Stopwatch.StartNew();
+                    if (dup != null)
+                    {
+                        bool lost;
+                        dup.Grab(clean.Bits, Area.Width * 4, out lost);
+                        if (lost)
+                        {
+                            // the desktop changed mode or went to a secure screen: start again, or fall back to BitBlt
+                            dup.Dispose();
+                            dup = DesktopDup.TryCreate(Area);
+                            if (dup == null) { clean.Dispose(); clean = null; FastCapture = false; }
+                            else dup.CopyFirst(clean.Bits, Area.Width * 4);
+                        }
+                    }
+                    if (dup != null) MF.CopyMemory(grab.Bits, clean.Bits, (UIntPtr)(uint)areaBytes);
+                    else Gdi.BitBlt(grab.Dc, 0, 0, Area.Width, Area.Height, screen, Area.X, Area.Y, Gdi.SRCCOPY);
                     cursors.Draw(grab.Dc, Area.Location);
                     var frame = grab;
                     if (scaled != null)
@@ -154,15 +213,32 @@ namespace Kadr
                         frame = scaled;
                     }
                     Gdi.GdiFlush();
-                    writer.WriteFrame(frame.Bits, t, interval);
+                    MsGrab += sw.Elapsed.TotalMilliseconds; sw.Restart();
+                    bool same = havePrev && Gdi.memcmp(frame.Bits, prev, (UIntPtr)(uint)bytes) == 0;
+                    MsCompare += sw.Elapsed.TotalMilliseconds; sw.Restart();
+                    if (!same || t - lastWritten >= keepAlive)
+                    {
+                        if (!skipEncode) writer.WriteFrame(frame.Bits, t, interval);
+                        if (!same) MF.CopyMemory(prev, frame.Bits, (UIntPtr)(uint)bytes);
+                        havePrev = true;
+                        lastWritten = t;
+                    }
+                    else Unchanged++;
+                    MsWrite += sw.Elapsed.TotalMilliseconds;
                     if (Frames == 0) Thumb = frame.ToBitmap(400, 300);
                     Frames++;
                     next = Math.Max(next + interval, t + interval / 2);   // fell behind: skip ahead instead of rushing
                 }
+                // the picture lasts until the stop even if the screen stood still at the end
+                long end = clock.Elapsed.Ticks;
+                if (havePrev && !skipEncode && end - lastWritten > interval && Error == null) writer.WriteFrame(prev, end - interval, interval);
             }
             catch (Exception ex) { Fail(ex); }
             finally
             {
+                Marshal.FreeHGlobal(prev);
+                if (dup != null) dup.Dispose();
+                if (clean != null) clean.Dispose();
                 grab.Dispose();
                 if (scaled != null) scaled.Dispose();
                 Gdi.ReleaseDC(IntPtr.Zero, screen);
@@ -299,6 +375,7 @@ namespace Kadr
         [DllImport("gdi32.dll")] public static extern bool StretchBlt(IntPtr dst, int x, int y, int w, int h, IntPtr src, int sx, int sy, int sw, int sh, int rop);
         [DllImport("gdi32.dll")] public static extern int SetStretchBltMode(IntPtr dc, int mode);
         [DllImport("gdi32.dll")] public static extern bool GdiFlush();
+        [DllImport("msvcrt.dll", CallingConvention = CallingConvention.Cdecl)] public static extern int memcmp(IntPtr a, IntPtr b, UIntPtr count);
         [DllImport("user32.dll")] public static extern bool GetCursorInfo(ref CURSORINFO ci);
         [DllImport("user32.dll")] public static extern bool GetIconInfo(IntPtr icon, out ICONINFO info);
         [DllImport("user32.dll")] public static extern bool DrawIconEx(IntPtr dc, int x, int y, IntPtr icon, int w, int h, int step, IntPtr brush, int flags);
